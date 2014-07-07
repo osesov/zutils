@@ -1,0 +1,343 @@
+#! /bin/bash
+
+unset LANG
+
+sln=PowerUp.sln
+config=~/bin/.zmk.config
+
+[ -f $config ] && source $config
+
+function die()
+{
+    echo "$@"
+    exit 1
+}
+
+function save-config()
+{
+    cat >$config <<END
+target='$target'
+dest='$dest'
+END
+}
+
+function split()
+{
+	old_ifs=$IFS
+	IFS=$1; shift
+	string=$1; shift
+	eval "read $* <<< '$string'"
+	IFS=$old_ifs
+}
+
+function use-target()
+{
+	target=$1
+
+	if [ -z "$target" ]; then
+		die "Target is not set"
+	fi
+
+	old_ifs=$IFS
+	IFS='-'
+	read mso platform mode <<< "$target"
+	IFS=$old_ifs
+
+	case $target in
+		nextgen-c5320-*|nextgen-samsung-*|nextgen-humax-*)
+			cpu=mips
+			;;
+		*) die "Unknown CPU $target"
+			;;
+	esac
+}
+
+function mksymbols()
+{
+	builddir=../output/${platform}-${cpu}-${mso}/${mode}
+	symdir=../symbols/${platform}-${cpu}-${mso}/${mode}
+
+	mkdir -p ${symdir}
+	for i in $builddir/*.sym; do
+		read module os arch hash name < <(head -n1 $i)
+		mkdir -p ${symdir}/$name/$hash/
+		cp -u $i ${symdir}/$name/$hash/
+	done
+}
+
+function stackwalk()
+{
+	mksymbols
+	ls -l ../symbols/${platform}-${cpu}-${mso}/${mode}
+	minidump_stackwalk $1 ../symbols/${platform}-${cpu}-${mso}/${mode} 2> $1.info > $1.text
+}
+
+function show-status()
+{
+	local i
+	case $scope in
+	world)
+		for i in *; do
+			if [ -d "$i/.svn" ]; then
+				echo "[svn] $i"
+				(cd $i && svn status)
+			elif [ -d "$i/.git" ]; then
+				echo "[git] $i"
+				(cd $i && git status -s)
+			elif [ -d "$i" ]; then
+				echo "skip $i"
+			fi
+		done
+		;;
+
+	*)
+		i=$(pwd)
+		local n=${i##*/}
+		if [ -d ".svn" ]; then
+			echo "[svn] $n"
+			svn status
+		elif [ -d ".git" ]; then
+			echo "[git] $n"
+			git status
+		else
+			echo "skip $n"
+		fi
+		;;
+	esac
+}
+
+function checkout()
+{
+	local svn_rev
+	local git_rev
+
+	if [[ "$1" =~ ([0-9]+)-([0-9]+)-([0-9]+) ]]; then
+		local year=${BASH_REMATCH[1]}
+		local month=${BASH_REMATCH[2]}
+		local day=${BASH_REMATCH[3]}
+
+		svn_rev="{$year-$month-$day}"
+		git_rev="{$year-$month-$day 00:00:00}"
+	else
+		die "Unvalid date specification '$1'"
+	fi
+
+	cat solution | grep -v "^#" | while read build repo branch; do
+		if [ -z "$repo" ]; then
+			continue
+		fi
+
+		local dir=${build%%/*}
+		pushd $dir > /dev/null || die "Unable to open dir: $dir"
+		echo [$dir]
+
+		if [ -d .svn ]; then
+			svn update -r "$svn_rev"
+		elif [ -d .git ]; then
+			eval "$branch"
+			git checkout "$BRANCH@$git_rev"
+		else
+		    die "unknown vcs: $dir"
+		fi
+		popd > /dev/null
+	done
+}
+
+function make-sh()
+{
+    case $1 in
+    build)      ./make.sh $2 || exit 1
+		if [ "$scope" == "world" -a "$mode" == "dbg" ]; then
+			mksymbols
+		fi
+		;;
+    clean)      ./make.sh clean-$2 ;;
+    rebuild)    make-sh clean $2 && make-sh build $2;;
+    update)     cd ../.. && ./vcs.sh update;;
+    set-config) save-config;;
+    get-config) echo $2;;
+    bt)         for i in $bt; do stackwalk $i; done ;;
+    status)	show-status;;
+    upload)	make-sh build $2 && zupload $2 ;;
+    checkout)	checkout $checkout_date;;
+    *)          echo Action is not supported; exit 1 ;; 
+    esac
+}
+
+function push-list()
+{
+	local name="$1"
+	local value="$2"
+
+	if [ -z "${!name}" ]; then
+		eval $name="$value"
+	else
+		eval "$name='${!name} $value'"
+	fi
+}
+
+echo "*** make using Zodiac build system"
+
+while test $# -ne 0; do
+    i=$1
+    shift
+
+    case "$i" in
+	--clean|--build|--rebuild|--resend)
+		action=${i:2}
+		;;
+
+	clean|build|rebuild|resend)
+		action=${i}
+		;;
+
+	--mod|-mod|-c|m|module)
+		scope="module"
+		;;
+
+	--prj|-prj|-p|p|prj|project)
+		scope="project"
+		;;
+
+	--world|-world|-w|world|w)
+		scope="world"
+		;;
+
+	u|upload)
+		scope="world"
+		action=upload
+		;;
+
+	--module|--world|--upload|--project)
+		scope=${i:2}
+		;;
+
+	update|--update)
+		scope=world
+		action=update
+		;;
+
+	bt)
+		scope=world
+		push-list action "$i"
+		i=$1
+		shift
+		push-list bt $(pwd)/$i
+		;;
+
+	set-config|--set-config)
+		scope=world
+		push-list action "set-config"
+		;;
+
+	get-config|--get-config)
+		scope=world
+		push-list action "get-config"
+		;;
+
+	status)
+		action=$i
+		scope=project
+		;;
+
+	wstatus)
+		scope=world
+		action=${i:1}
+		;;
+
+	checkout)
+		checkout_date=$1
+		shift
+		action=$i
+		;;
+
+	--*|-*)
+		echo "Unknown option $i";
+		exit 1
+		;;
+
+	*)	push-list ctarget "$i"
+		;;
+
+    esac
+
+done
+
+if [ -n "$ctarget" ]; then
+	target="$ctarget"
+
+elif [ -z "$target" ]; then
+	target=nextgen-c5320-dev
+#	target=nextgen-humax-dev
+fi
+
+if [ -z "$action" ]; then
+	action=build
+fi
+
+
+if [ -z "$scope" ]; then
+	if [ -f "$sln" -o -f "apps/$sln" -o -f "native/apps/$sln" ]; then
+	    scope="world";
+	else
+	    scope="module"
+	fi
+fi
+
+case $scope in
+world)
+	makefile=PowerUp.sln
+	build=make-sh
+	dir_list="native/apps apps ../apps"
+	echo "*** build world ***"
+	;;
+
+module)
+	makefile=make.sh
+	build=make-sh
+	echo "*** build module ***"
+	;;
+
+project)
+	makefile=../PowerUp.sln
+	build=make-sh
+	echo "*** build project ***"
+	;;
+
+esac
+
+found=no
+for p in $dir_list; do
+    if [ -f $p/$makefile ]; then
+	found=yes
+	break
+    fi
+done
+
+if [ "$found" != "yes" ]; then
+    p=`pwd`
+    while [ "$p" != "/" -a ! -f "$p/$makefile" ]; do
+	p=`dirname $p`
+    done
+fi
+
+if [ ! -f "$p/$makefile" ]; then
+	echo "$makefile not found"
+	exit 1
+fi
+
+echo "Using dir: $p"
+cd $p
+
+# export ENABLE_DEBUG_SYMBOLS=1
+#export LDFLAGS=-g
+#export CFLAGS=-g
+#export CXXFLAGS=-g
+
+echo "Build $scope $target"
+for t in $target; do
+    use-target $t
+    for i in $action; do
+	$build $i $t || exit 1
+    done
+done

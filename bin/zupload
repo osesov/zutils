@@ -1,0 +1,241 @@
+#! /bin/bash
+
+# set -x
+
+config=~/bin/.zmk.config
+[ -f $config ] && source $config
+
+if [ -z "$dest" ]; then
+    dest=ftp://ftp.developonbox.ru/common/nfsroot/root/olegs/dal
+fi
+
+PATH=/opt/toolchains/gcc-4.2.0/bin:$PATH
+
+function die()
+{
+	echo $*
+	exit 1
+}
+
+##################################################################
+# File publishing
+
+function file.publish_begin()
+{
+	return 0
+}
+
+function file.publish_end()
+{
+	sync
+}
+
+function file.publish_file()
+{
+	local src=$1
+	local dst=$2
+	local dir=${dst%/*}
+
+	mkdir -p $dir || die "unable to create dir: $dir"
+
+	if [ ! -f "$dst" -o "$src" -nt "$dst" ]; then
+		echo " (update)"
+		mipsel-uclibc-objcopy --strip-unneeded $src $dst || die "Unable to copy $src into $dst"
+	else
+		echo " (skip)"
+	fi
+}
+
+###################################################################
+# curl publishing
+
+function curl.publish_begin()
+{
+	local dst=$1
+	local full_upgrade=yes
+
+	curl_server=${dst#*://}
+	curl_server=${curl_server%%/*}
+
+	curl_tmpdir=${HOME-/var}/tmp/zupdate/${curl_server}
+	curl_modefile=${curl_tmpdir}/mode
+	curl_newmode="$platform-$cpu-$mso-$mode"
+
+	[ -d "${curl_tmpdir}" ] || mkdir -p "${curl_tmpdir}" || die "unable to create temp dir: ${curl_tmpdir}"
+    
+	if [ -f ${curl_modefile} ]; then
+		local lastmode=$(< ${curl_modefile})
+#		echo last mode:$lastmode, new mode:${curl_newmode}
+		if [ "${curl_newmode}" == "$lastmode" ]; then
+			full_upgrade=no
+		fi
+	fi
+
+	if [ "$full_upgrade" == "yes" ]; then
+		echo "Perform full upgrade"
+		rm -rf ${curl_tmpdir}/*
+	fi
+
+	echo "publish via ${curl_tmpdir}"
+#	echo "update to ${curl_newmode}"
+}
+
+function curl.publish_end()
+{
+#	echo "update to ${curl_newmode}"
+	echo ${curl_newmode} > ${curl_modefile}
+}
+
+function cksum()
+{
+	local file=$1
+	if [ -f "$file" ]; then
+		sha1sum -b $file | cut -d ' ' -f1
+	fi
+}
+
+function curl.publish_file()
+{
+	local src=$1
+	local dst=$2
+	local temp=${curl_tmpdir}/${src##*/}
+	local src_cksum=$(cksum $src)
+	local imm_cksum=$(cksum $temp)
+
+	mkdir -p ${curl_tmpdir} || die "unable to create dir: ${curl_tmpdir}"
+	if [ ! -f "$temp" -o "$src" -nt "$temp" -o "$src_cksum" != "$imm_cksum" ]; then
+		echo " (update)"
+		mipsel-uclibc-objcopy --strip-unneeded $src $temp || die "Unable to strip $src into $temp"
+		# -u <user:password> vs --netrc
+		curl --insecure --progress-bar --ftp-create-dirs --netrc --upload-file $temp $dst < /dev/null 2> /dev/null || die "Unable to send file $temp to $dst"
+	else
+		echo " (skip)"
+	fi
+}
+
+######################################################################
+function publish_begin()
+{
+	local dst=$1
+
+	echo " Publish to $dst"
+	case $dst in
+	file://*) file.publish_begin $* ;;
+	svn://*)  svn.publish_begin  $* ;;
+	*://*)    curl.publish_begin $* ;;
+	esac
+}
+
+function publish_end()
+{
+	local dst=$1
+
+	case $dst in
+	file://*) file.publish_end $* ;;
+	svn://*)  svn.publish_end  $* ;;
+	*://*)    curl.publish_end $* ;;
+	esac
+}
+
+function publish_file()
+{
+	local src=$1
+	local dst=$2
+
+	echo -ne "    ${src##*/} -> $dst"
+	if [ ! -f "$src" ]; then
+		echo " (source not found, file: $src cwd: $(pwd))"
+		return 1
+	fi
+
+	case $dst in
+	file://*) file.publish_file $* ;;
+	svn://*)  svn.publich_file  $* ;;
+	*://*)    curl.publish_file $* ;;
+	esac
+}
+
+
+function dist_files()
+{
+    files="$files $@"
+}
+
+#pwd
+
+target=$1
+source=${2:-..}
+
+if [ -z "$target" ]; then
+	die "Target is not set"
+fi
+
+case $dest in
+	*://*)
+		;;
+
+	*)
+		alt_dir="/media/E417-7216 /media/usb"
+
+		for i in $alt_dir; do
+			if [ -d "$i" ]; then
+				dest=$i/dal
+				break;
+			fi
+		done
+		;;
+esac
+
+if [ -z "$dest" ]; then
+	echo "unable to detect top dir"
+	exit 1
+fi
+
+old_ifs=$IFS
+IFS='-'
+read mso platform mode <<< "$target"
+IFS=$old_ifs
+
+case $target in
+	nextgen-c5320-*|nextgen-samsung-*|nextgen-humax-*)
+		cpu=mips
+		;;
+	*) die "Unknown CPU $target"
+		;;
+esac
+
+# normalize destination url
+case $dest in
+    *://*) ;;
+    *)     dest=file://$dest;;
+esac
+
+src=$source/output/$platform-$cpu-$mso/$mode
+#src=../output/c5320-mips-nextgen/dev
+
+
+echo "publish ($src) to $dest"
+
+dist_files  DALManager
+dist_files  libpowerup.so libtoopl.so libsdv.so libprofile.so libipg.so
+dist_files  libdc.so libns.so libdts.so libzvod.so
+dist_files  libpowerup-api.so
+dist_files  libdvbs.so
+dist_files  libskia.so
+dist_files  ncas_host_app
+dist_files  powerup-launcher
+dist_files  libcarousels.so libipc.so
+dist_files  libnetsnmpagent.so libnetsnmphelpers.so libnetsnmpmibs.so libnetsnmp.so
+dist_files  libyaml.so libz.so libjpeg.so libfreetype.so libcurl.so
+dist_files  libbreakpad_client.so libpng.so
+
+publish_begin $dest
+
+for i in $files; do
+    case $i in
+    *:*) publish_file $src/${i%:*} $dest/${i##*:};;
+    *)   publish_file $src/$i $dest/$i;;
+    esac
+done
+
+publish_end $dest
