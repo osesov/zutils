@@ -49,6 +49,7 @@ while read str; do
 		echo "url: ${dump_url}${id}" >> $view_path
 		echo "${dump}" >> $view_path
 		seen[$cksum]=1
+		view_list="$view_list $view_path"
 	else
 		echo "$date $component: $id: dup"
 	fi
@@ -61,3 +62,8 @@ while read str; do
     fi
 
 done < <( curl -s "$url" | sed -e 's/<br>/\n/g' )
+
+
+if [ -n "$view_list" ]; then
+	less $view_list
+fi
