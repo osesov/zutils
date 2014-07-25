@@ -1,0 +1,63 @@
+#!/bin/bash
+
+start_date=${1:-$(date +'%F')}
+timestamp=$(date -d "$start_date" +'%s')
+
+url=http://10.241.243.119:8080/uhms/stbMinidumpsList?from=${timestamp}000
+dump_url=http://10.241.243.119:8080/uhms/stbMinidump?uuid=
+filter_component=(DAL)
+
+dump_dir=dump
+view_dir=view
+
+declare -A seen
+#
+# 8018A766CD56  time: 2014-07-24 17:19:11:000  id: 30e073b8-5acc-9936-29c6d526-44f93bb1  component: dvbs   <a href='stbMinidump?uuid=30e073b8-5acc-9936-29c6d526-44f93bb1'>link</a><br>
+# ifs="!"
+while read str; do
+
+#    if [[ "$str" =~ "time:[:space:]+([0-9\-]+[:space:][0-9:]+)[:space:]+id:[:space:]+([0-9a-f\-]+)[:space:]+component:[:space:]+([^:space:])" ]]; then
+    if [[ "$str" =~ time:[\ \t]+([0-9\-]+)\ ([0-9:]+)[\ \t]+id:\ ([0-9a-f\-]+)[\ \t]+component:[\ \t]+([^\ \t]+) ]]; then
+
+	date=${BASH_REMATCH[1]}
+	time=${BASH_REMATCH[2]}
+	id=${BASH_REMATCH[3]}
+	component=${BASH_REMATCH[4]}
+
+	use_component=
+	for i in ${filter_component[@]}; do
+		if [[ $component == $i ]]; then
+			use_component=1
+			break;
+		fi
+	done
+
+	if [ "${use_component}" != "1" ]; then
+		continue
+	fi
+
+	dump=$(curl -s ${dump_url}${id} | grep -v "^     ")
+	cksum=$(echo ${dump} | sha1sum -)
+	view_path=$view_dir/$date
+	dump_path=$dump_dir/$date
+
+	if [[ ${seen[$cksum]} != 1 ]]; then
+		echo "$date $component: $id: ok"
+		mkdir -p $view_path
+		view_path=$view_path/$id.text
+		echo ===[[[ $component: $id. $date $time ]]]=== > $view_path
+		echo "url: ${dump_url}${id}" >> $view_path
+		echo "${dump}" >> $view_path
+		seen[$cksum]=1
+	else
+		echo "$date $component: $id: dup"
+	fi
+
+	mkdir -p $dump_path
+	echo "${dump}" > $dump_path/$id.text
+
+#    else
+#	echo do not match: $str
+    fi
+
+done < <( curl -s "$url" | sed -e 's/<br>/\n/g' )
