@@ -146,12 +146,12 @@ function checkout()
 function make-sh()
 {
     case $1 in
-    build)      ./make.sh $2 || exit 1
+    build)      bash ./make.sh $2 || exit 1
 		if [ "$scope" == "world" -a "$mode" == "dbg" ]; then
 			mksymbols
 		fi
 		;;
-    clean)      ./make.sh clean-$2 ;;
+    clean)      bash ./make.sh clean-$2 ;;
     rebuild)    make-sh clean $2 && make-sh build $2;;
     update)     cd ../.. && ./vcs.sh update;;
     set-config) save-config;;
