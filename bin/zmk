@@ -16,8 +16,8 @@ function die()
 function save-config()
 {
     cat >$config <<END
-target='$target'
-dest='$dest'
+target=$target
+dest=$dest
 END
 }
 
@@ -44,7 +44,7 @@ function use-target()
 	IFS=$old_ifs
 
 	case $target in
-		nextgen-c5320-*|nextgen-samsung-*|nextgen-humax-*)
+		cvc-c5320-*|cvc-samsung-*|cvc-humax-*)
 			cpu=mips
 			;;
 		*) die "Unknown CPU $target"
@@ -65,11 +65,44 @@ function mksymbols()
 	done
 }
 
+function gensymbols-stripped()
+{
+	local builddir=$1
+	local symdir=$2
+
+	mkdir -p ${symdir}
+	for i in $builddir/*; do
+		type=$(file $i)
+		local sym=$i.sym
+		local target=$symdir/${i##*/}
+		if [[ $type =~ executable|shared\ object ]]; then
+			if [ "$i" -nt "$sym" ]; then
+				echo process: "$i => $sym"
+#				mipsel-linux-strip -s $i
+				dump_syms $i 2> >(grep -v 'file contains no debugging information') > $sym
+				read module os arch hash name < <(head -n1 $sym)
+				mkdir -p ${symdir}/$name/$hash/
+				cp -u $sym ${symdir}/$name/$hash/
+			fi
+		fi
+	done
+}
+
+function mksymbols-stripped()
+{
+	builddir=../output/${platform}-${cpu}-${mso}/${mode}
+	osdir=../osdir/${platform}-${cpu}-${mso}
+	symdir=../symbols/${platform}-${cpu}-${mso}/${mode}
+
+	gensymbols-stripped $builddir $symdir
+	gensymbols-stripped $osdir $symdir
+}
+
 function stackwalk()
 {
-	mksymbols
+#	mksymbols
 	ls -l ../symbols/${platform}-${cpu}-${mso}/${mode}
-	minidump_stackwalk $1 ../symbols/${platform}-${cpu}-${mso}/${mode} 2> $1.info > $1.text
+	minidump_stackwalk $1 ../symbols/${platform}-${cpu}-${mso}/${mode} 2> $1.info | grep -v "[a-z][a-z0-9] = \|Found by:" | mipsel-linux-c++filt > $1.text
 }
 
 function show-status()
@@ -149,6 +182,8 @@ function make-sh()
     build)      bash ./make.sh $2 || exit 1
 		if [ "$scope" == "world" -a "$mode" == "dbg" ]; then
 			mksymbols
+		else
+			mksymbols-stripped
 		fi
 		;;
     clean)      bash ./make.sh clean-$2 ;;
@@ -267,8 +302,8 @@ if [ -n "$ctarget" ]; then
 	target="$ctarget"
 
 elif [ -z "$target" ]; then
-	target=nextgen-c5320-dev
-#	target=nextgen-humax-dev
+	target=cvc-c5320-dev
+#	target=cvc-humax-dev
 fi
 
 if [ -z "$action" ]; then

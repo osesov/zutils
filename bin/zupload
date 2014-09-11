@@ -33,14 +33,14 @@ function file.publish_end()
 function file.publish_file()
 {
 	local src=$1
-	local dst=$2
+	local dst=${2#*://}
 	local dir=${dst%/*}
 
 	mkdir -p $dir || die "unable to create dir: $dir"
 
 	if [ ! -f "$dst" -o "$src" -nt "$dst" ]; then
 		echo " (update)"
-		mipsel-uclibc-objcopy --strip-unneeded $src $dst || die "Unable to copy $src into $dst"
+		mipsel-uclibc-objcopy --strip-unneeded "$src" "$dst" || die "Unable to copy $src into $dst"
 	else
 		echo " (skip)"
 	fi
@@ -197,7 +197,7 @@ read mso platform mode <<< "$target"
 IFS=$old_ifs
 
 case $target in
-	nextgen-c5320-*|nextgen-samsung-*|nextgen-humax-*)
+	cvc-c5320-*|cvc-samsung-*|cvc-humax-*)
 		cpu=mips
 		;;
 	*) die "Unknown CPU $target"
@@ -211,13 +211,13 @@ case $dest in
 esac
 
 src=$source/output/$platform-$cpu-$mso/$mode
-#src=../output/c5320-mips-nextgen/dev
+#src=../output/c5320-mips-cvc/dev
 
 
 echo "publish ($src) to $dest"
 
 dist_files  DALManager
-dist_files  libpowerup.so libtoopl.so libsdv.so libprofile.so libipg.so
+dist_files  libpowerup.so libtoopl.so libsdv.so libprofile.so libipg.so libekg.so
 dist_files  libdc.so libns.so libdts.so libzvod.so
 dist_files  libpowerup-api.so
 dist_files  libdvbs.so
