@@ -77,7 +77,7 @@ function gensymbols-stripped()
 		local target=$symdir/${i##*/}
 		if [[ $type =~ executable|shared\ object ]]; then
 			if [ "$i" -nt "$sym" ]; then
-				echo process: "$i => $sym"
+				echo "Generate symbols $i => $sym"
 #				mipsel-linux-strip -s $i
 				dump_syms $i 2> >(grep -v 'file contains no debugging information') > $sym
 				read module os arch hash name < <(head -n1 $sym)
