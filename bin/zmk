@@ -180,10 +180,12 @@ function make-sh()
 {
     case $1 in
     build)      bash ./make.sh $2 || exit 1
-		if [ "$scope" == "world" -a "$mode" == "dbg" ]; then
-			mksymbols
-		else
-			mksymbols-stripped
+		if [ "$scope" == "world" ]; then
+			if [ "$mode" == "dbg" ]; then
+			    mksymbols
+			else
+			    mksymbols-stripped
+		    fi
 		fi
 		;;
     clean)      bash ./make.sh clean-$2 ;;
