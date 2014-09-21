@@ -9,23 +9,81 @@
 #ifndef __ZODIAC_DALSHARED_RMI_H__
 #define __ZODIAC_DALSHARED_RMI_H__
 
-#include "toopl/common/tkl_stdint.h"
+#define RMI_STANDALONE
+
+#ifdef RMI_STANDALONE
+
+#include <string>
+typedef unsigned int   uint32_t;
+typedef unsigned short uint16_t;
 
 namespace Zodiac { namespace RMI
 {
+    typedef std::string rmi_string;
+}}
+
+#else
+#include "toopl/common/tkl_stdint.h"
+#include "toopl/stl/tkl_string.h"
+
+namespace Zodiac { namespace RMI
+{
+    typedef Tackle::string rmi_string;
+}}
+
+#endif
+
+///////////////////////////////////////////////////////////////////////
+// small macro library
+///////////////////////////////////////////////////////////////////////
+#define CONCATENATE(arg1, arg2)   CONCATENATE1(arg1, arg2)
+#define CONCATENATE1(arg1, arg2)  CONCATENATE2(arg1, arg2)
+#define CONCATENATE2(arg1, arg2)  arg1##arg2
+
+#define FOR_EACH_0(what, ...)
+#define FOR_EACH_1(what, x, ...) what(x)
+#define FOR_EACH_2(what, x, ...) what(x)VA_EXPAND(FOR_EACH_1(what, __VA_ARGS__))
+#define FOR_EACH_3(what, x, ...) what(x)VA_EXPAND(FOR_EACH_2(what, __VA_ARGS__))
+#define FOR_EACH_4(what, x, ...) what(x)VA_EXPAND(FOR_EACH_3(what, __VA_ARGS__))
+#define FOR_EACH_5(what, x, ...) what(x)VA_EXPAND(FOR_EACH_4(what, __VA_ARGS__))
+#define FOR_EACH_6(what, x, ...) what(x)VA_EXPAND(FOR_EACH_5(what, __VA_ARGS__))
+#define FOR_EACH_7(what, x, ...) what(x)VA_EXPAND(FOR_EACH_6(what, __VA_ARGS__))
+#define FOR_EACH_8(what, x, ...) what(x)VA_EXPAND(FOR_EACH_7(what, __VA_ARGS__))
+
+#ifdef _MSC_VER
+#define VA_EXPAND(x) x
+#else
+#define VA_EXPAND(...) __VA_ARGS__
+#endif
+
+#define VA_NUM_ARGS(...) VA_EXPAND(VA_NUM_ARGS_( __VA_ARGS__, 5, 4, 3, 2, 1, 0))
+#define VA_NUM_ARGS_(_1,_2,_3,_4,_5,N,...) N
+
+#define FOR_EACH_(N, what, ...) CONCATENATE(FOR_EACH_, N)(what, __VA_ARGS__)
+#define FOR_EACH(what, ...)     FOR_EACH_(VA_NUM_ARGS(__VA_ARGS__), what, ##__VA_ARGS__)
+
+///////////////////////////////////////////////////////////////////////
+
+
+namespace Zodiac { namespace RMI
+{
+
+#define ZODIAC_RMI_ANNOTATE2(x) Annotate2::x;
+
 #define ZODIAC_RMI_INTERFACE( name ) struct name : public Zodiac::RMI::Client
-#define ZODIAC_RMI_METHOD2(name, proto, ...) \
+#define ZODIAC_RMI_METHOD2(method_name, proto, ...) \
+    FOR_EACH(ZODIAC_RMI_ANNOTATE2, Empty, __VA_ARGS__)
 	struct \
 	{ \
 		typedef Zodiac::RMI::Function<proto>::Type Type; \
-		static const char * name() { return #name; } \
-		static const Annotation& annotation() { Annotation ann(__VA_ARGS__); return &ann;} \
+		static const char * name() { return #method_name; } \
+        static void annotation() { FOR_EACHz(ZODIAC_RMI_ANNOTATE2, Empty, __VA_ARGS__) ;} \
 	} \
-	static name(Zodiac::RMI::EntryInfo&, Zodiac::RMI::Function<proto>::Pointer); \
+	static method_name(Zodiac::RMI::EntryInfo&, Zodiac::RMI::Function<proto>::Pointer); \
 	\
-	Zodiac::RMI::CallStatus name(Zodiac::RMI::Function<proto>::Arg1 a1, Zodiac::RMI::Function<proto>::Arg2 a2) \
+	Zodiac::RMI::CallStatus method_name(Zodiac::RMI::Function<proto>::Arg1 a1, Zodiac::RMI::Function<proto>::Arg2 a2) \
 	{ \
-		return call_method( #name, a1, a2 ); \
+		return call_method( #method_name, a1, a2 ); \
 	}
 
 	template <typename T>
@@ -131,9 +189,8 @@ namespace Zodiac { namespace RMI
 
 	};
 
-	struct DVBS_RPC
-	{
-	};
+    ///////////////////////////////////////////////////////////////////
+    struct DVBS_RPC;
 
 	template <>
 	struct RmiTransport<DVBS_RPC> : public IRmiTransport
@@ -141,6 +198,15 @@ namespace Zodiac { namespace RMI
 
 	};
 
+    namespace Annotate2
+    {
+    	struct DVBS_RPC
+	    {
+            DVBS_RPC(const char * ipc_name);
+	    };
+    }
+
+    ///////////////////////////////////////////////////////////////////
 	struct InProcess
 	{
 
@@ -159,24 +225,15 @@ namespace Zodiac { namespace RMI
 
 	struct JsonRPC
 	{
-		struct Address
-		{
+    };
 
-		};
-
-		struct Annotate_1 {};
-		struct Annotate_2 {};
-		struct Annotate_3 {};
-		struct Annotate_4 {};
-	};
-
-	struct JSON_RPC
-	{
-
-	};
-
-	template <class T> void annotation(T);
-	template <class A1, class A2> void annotation(A1, A2);
+    namespace Annotate2
+    {
+        struct JSON_RPC
+        {
+            JSON_RPC(const char * rmi_name, const char * a1, const char * a2);
+        };
+    }
 }}
 
 #endif // __ZODIAC_DALSHARED_RMI_H__
