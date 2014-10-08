@@ -1,0 +1,16 @@
+#! /bin/bash
+
+user=$1
+begin=${2:-1}
+
+for i in *; do
+    if [ -d "$i/.svn" ]; then
+	r=$( cd $i; svn log -r ${begin}:HEAD -v | sed -n "/$1/,/-----\$/ p" )
+	if [ "$r" != "" ]; then
+	    echo "=== $i ==="
+	    echo "$r"
+	fi
+    fi
+done
+
+
