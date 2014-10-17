@@ -45,8 +45,9 @@ function use-target()
 
 	case $target in
 		cvc-c5320-*|cvc-samsung-*|cvc-humax-*)
-			cpu=mips
-			;;
+			cpu=mips;;
+		charter-humaxwb-*)
+			cpu=mips;;
 		*) die "Unknown CPU $target"
 			;;
 	esac
