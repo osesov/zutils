@@ -1,16 +1,34 @@
 #! /bin/bash
 
-user=$1
-begin=${2:-1}
+rev=1
+dir=.
 
-for i in *; do
-    if [ -d "$i/.svn" ]; then
-	r=$( cd $i; svn log -r ${begin}:HEAD -v | sed -n "/$1/,/-----\$/ p" )
-	if [ "$r" != "" ]; then
-	    echo "=== $i ==="
-	    echo "$r"
-	fi
-    fi
+while getopts "u:r:d:" opt; do
+    echo "$opt"
+    case $opt in
+    r) rev=$OPTARG;;
+    d) dir=$OPTARG;;
+    h)
+	printf "%s -- list svn commits\n" $(basename $0)
+	printf "usage: %s [-u<user>|-r<revision>|-d<dir>]...\n" $(basename $0)
+	;;
+
+    \?) echo "Invalid option: -$OPTARG" >&2; exit 1 ;;
+    :)  echo "Option -$OPTARG requires an argument." >&2;  exit 1;;
+    esac
 done
 
+shift $(($OPTIND-1))
 
+for i in $*; do
+	if [ -d "${dir}/.svn" ]; then
+		r=$( cd ${dir}; svn log -r ${rev}:HEAD -v | sed -n "/$1/,/-----\$/ p" )
+		if [ "$r" != "" ]; then
+			echo "=== $i ==="
+			echo "$r"
+		fi
+	else
+		echo "This not an svn work dir ${dir}"
+		exit 1
+	fi
+done
