@@ -1,0 +1,66 @@
+#!/bin/bash
+
+input_file=$1
+strip=$2
+replace=$3
+
+# read group config
+first_line=yes
+while read line; do
+#    echo "[$line]"
+
+    OIFS=$IFS
+    IFS=';'
+    arr=$line
+    num=0
+    for x in $arr; do
+#        echo "> [$x]"
+	data[$((num++))]=$x
+    done
+
+    IFS=$OIFS
+
+    index=0
+    if [ x$first_line == xyes ]; then
+	for x in ${!data[@]}; do
+#	    echo ${data[$x]} "->" $x
+
+	    case "${data[$x]}" in
+	    command) command_field=$x;;
+	    name)    url_field=$x;;
+	    version) version_field=$x;;
+	    esac
+	done
+#	echo "command: $command_field"
+#	echo "url: $url_field"
+#	echo "version: $version_field"
+	first_line=no
+    else
+	command=${data[$command_field]}
+
+	case "$command" in
+	app|lib|file|svc)
+		url=${data[$url_field]}
+		version=${data[$version_field]}
+		eval file=$replace${url%${strip}}
+#		echo "url: $url"
+#		echo "version: $version"
+#		echo "file: $file"
+
+		version=$(sha1sum $file | cut -d ' ' -f1 )
+		if [ $? != 0 ]; then
+		    exit 1
+		fi
+		data[$version_field]=$version
+
+		line=""
+	    	for x in ${!data[@]}; do
+		    line="$line${data[$x]};"
+		done
+	    ;;
+	esac
+    fi
+    echo $line
+done < <( cat $1 )
+
+
