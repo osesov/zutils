@@ -1,8 +1,9 @@
 #!/bin/bash
 
 input_file=$1
-strip=$2
-replace=$3
+search=${2:-*://}
+replace=${3:-.}
+new_group=
 
 # read group config
 first_line=yes
@@ -42,13 +43,18 @@ while read line; do
 	app|lib|file|svc)
 		url=${data[$url_field]}
 		version=${data[$version_field]}
-		eval file=$replace${url%${strip}}
+		file=${url/"$search"/"$replace"}
+#		echo "${file}"
+#		eval file=$replace${url%${search}}
+#		file=$( awk 'BEGIN {u="'$url'"; sub("'$search'", "'$replace'", u); print u}' )
+#		echo $file
 #		echo "url: $url"
 #		echo "version: $version"
 #		echo "file: $file"
 
 		version=$(sha1sum $file | cut -d ' ' -f1 )
 		if [ $? != 0 ]; then
+		    echo "Err"
 		    exit 1
 		fi
 		data[$version_field]=$version
@@ -60,7 +66,8 @@ while read line; do
 	    ;;
 	esac
     fi
-    echo $line
-done < <( cat $1 )
+    new_group="$new_group$line
+"
+done < <( cat $input_file )
 
-
+echo -ne "$new_group" > $input_file.new
