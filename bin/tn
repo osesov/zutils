@@ -1,0 +1,74 @@
+#! /bin/bash
+
+function die()
+{
+	echo $*
+	exit 1
+}
+
+
+addr=ip
+box=
+boxdir=~/.box
+curbox=$boxdir/current
+mode=${0##*/}
+use_ip=
+
+case $mode in
+    cmd2k|tn)
+	use_ip=yes;
+	addr=ip;;
+    sling)
+	addr=$mode;;
+    *) die "unknown sub command: $mode" ;;
+esac
+
+while test $# -ne 0; do
+	i=$1
+
+	case $i in
+	-rf) [ -n "$use_ip" ] && addr=rf;;
+	-ip) [ -n "$use_ip" ] && addr=ip;;
+	-sling) [ -z "$use_ip" ] && addr=sling;;
+	-*) die "unknosn option $i";;
+	@*) box=${i:1};;
+	*) [ "$mode" = "cmd2k" ] || die "Extra arguments"; break;
+	esac
+
+	shift
+done
+
+newbox=$boxdir/$box
+
+if [ -z "$box" ]; then
+    [ -f "$curbox" ] || die "No current box defined"
+elif [ -f "$newbox" ]; then
+    ln -sf "$newbox" "$curbox"
+else
+    die "box $box not found in $boxdir"
+fi
+
+cur=$(readlink $curbox)
+box=${cur##*/}
+
+echo "Using box: $box"
+source $curbox
+
+addr=${!addr}
+[ -n "$addr" ] || die "Address for $mode is not defined"
+echo "Address: $addr($mode)"
+
+case "$mode" in 
+    sling)
+	;;
+
+    cmd2k)
+	cmd2000 $addr "$*" 2>/dev/null # | cut -b46-
+	;;
+    tn)
+	ping -w90 -c1 $addr || die "Unabe to ping box"
+	sleep 0.5
+	exec telnet $addr
+	;;
+esac
+
