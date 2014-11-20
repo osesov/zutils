@@ -1,0 +1,5 @@
+distdir=~/box/dist/
+daldir=~/box/dal
+target=cvc-c5320-dev
+dest=${distdir}/build
+group_cfg=( ${daldir}/101/group.cfg:'${distdir}':$HOME/box/dist  ${daldir}/default/group.cfg:'${distdir}':$HOME/box/dist )

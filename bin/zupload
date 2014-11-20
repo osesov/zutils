@@ -239,3 +239,14 @@ for i in $files; do
 done
 
 publish_end $dest
+
+for g in ${group_cfg[@]}; do
+	
+	old_ifs=$IFS
+	IFS=':'
+	read path search replace <<< "$g"
+	IFS=$old_ifs
+
+	echo "Update $path with '$search' = '$replace'"
+	update-group-cfg $path "$search" "$replace"
+done

@@ -1,4 +1,4 @@
-#!/bin/bash
+#! /bin/bash
 
 input_file=$1
 search=${2:-*://}
