@@ -30,11 +30,9 @@ while read line; do
 	    command) command_field=$x;;
 	    name)    url_field=$x;;
 	    version) version_field=$x;;
+	    size)    size_field=$x;;
 	    esac
 	done
-#	echo "command: $command_field"
-#	echo "url: $url_field"
-#	echo "version: $version_field"
 	first_line=no
     else
 	command=${data[$command_field]}
@@ -52,12 +50,21 @@ while read line; do
 #		echo "version: $version"
 #		echo "file: $file"
 
-		version=$(sha1sum $file | cut -d ' ' -f1 )
-		if [ $? != 0 ]; then
-		    echo "Err"
-		    exit 1
+		if [ -n "$version_field" ]; then
+			version=$(sha1sum $file | cut -d ' ' -f1 )
+			if [ $? != 0 ]; then
+			    echo "Err"
+			    exit 1
+			fi
+#			echo "ver: $version_field -- $version"
+			data[$version_field]=$version
 		fi
-		data[$version_field]=$version
+
+		if [ -n "$size_field" ]; then
+			size=$( ls -l $file | cut -d ' ' -f5 )
+			data[$size_field]=$size
+#			echo "size: $size_field -- $size:${data[$size_field]}"
+		fi
 
 		line=""
 	    	for x in ${!data[@]}; do
@@ -70,4 +77,4 @@ while read line; do
 "
 done < <( cat $input_file )
 
-echo -ne "$new_group" > $input_file.new
+echo -ne "$new_group" > $input_file
