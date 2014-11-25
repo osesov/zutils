@@ -6,22 +6,42 @@ function die()
 	exit 1
 }
 
-
 addr=ip
 box=
 boxdir=~/.box
 curbox=$boxdir/current
 mode=${0##*/}
 use_ip=
+multiarg=
+
+if [ "$mode" = "tn" ]; then
+    case $1 in
+    cmd2k|zget|zwalk|set)
+	mode=$1
+	shift
+	;;
+    esac
+fi
 
 case $mode in
-    cmd2k|tn)
+    set) ;;
+
+    tn)
 	use_ip=yes;
 	addr=ip;;
+
+    cmd2k|zget|zwalk)
+	multiarg=yes
+	use_ip=yes
+	addr=ip;;
+
     sling)
 	addr=$mode;;
-    *) die "unknown sub command: $mode" ;;
+
+    *)
+	die "unknown sub command: $mode";;
 esac
+
 
 while test $# -ne 0; do
 	i=$1
@@ -32,7 +52,7 @@ while test $# -ne 0; do
 	-sling) [ -z "$use_ip" ] && addr=sling;;
 	-*) die "unknosn option $i";;
 	@*) box=${i:1};;
-	*) [ "$mode" = "cmd2k" ] || die "Extra arguments"; break;
+	*) [ -n "$multiarg" ] || die "Extra arguments"; break;
 	esac
 
 	shift
@@ -65,10 +85,21 @@ case "$mode" in
     cmd2k)
 	cmd2000 $addr "$*" 2>/dev/null # | cut -b46-
 	;;
+
     tn)
 	ping -w90 -c1 $addr || die "Unabe to ping box"
 	sleep 0.5
 	exec telnet $addr
 	;;
+
+    zwalk)
+	snmpwalk -v 2c -c CvC0ms $addr:161 $*
+	;;
+
+    zget)
+	snmpget -v 2c -c CvC0ms $addr:161 $*
+	;;
+
+    set);;
 esac
 
