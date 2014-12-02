@@ -1,13 +1,11 @@
 #! /bin/bash
 
 rev=1
-dir=.
 user='[a-z.]+'
 
-while getopts "u:r:d:" opt; do
+while getopts "u:r:" opt; do
     case $opt in
     r) rev=$OPTARG;;
-    d) dir=$OPTARG;;
     u) user=$OPTARG;;
     h)
 	printf "%s -- list svn commits\n" $(basename $0)
@@ -21,15 +19,15 @@ done
 
 shift $(($OPTIND-1))
 
-for i in $*; do
+for dir in $*; do
 	if [ -d "${dir}/.svn" ]; then
 		r=$( cd ${dir}; svn log -r ${rev}:HEAD -v | sed -n "/^r[0-9]\+ [|] [^ \t]*$user[^ \t]* [|] /,/-----\$/ p" )
 		if [ "$r" != "" ]; then
-			echo "=== $i ==="
+			echo "=== $dir ==="
 			echo "$r"
 		fi
-	else
-		echo "This not an svn work dir ${dir}"
-		exit 1
+#	else
+#		echo "This not an svn work dir ${dir}"
+# 		exit 1
 	fi
 done
