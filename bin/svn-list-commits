@@ -2,12 +2,13 @@
 
 rev=1
 dir=.
+user='[a-z.]+'
 
 while getopts "u:r:d:" opt; do
-    echo "$opt"
     case $opt in
     r) rev=$OPTARG;;
     d) dir=$OPTARG;;
+    u) user=$OPTARG;;
     h)
 	printf "%s -- list svn commits\n" $(basename $0)
 	printf "usage: %s [-u<user>|-r<revision>|-d<dir>]...\n" $(basename $0)
@@ -22,7 +23,7 @@ shift $(($OPTIND-1))
 
 for i in $*; do
 	if [ -d "${dir}/.svn" ]; then
-		r=$( cd ${dir}; svn log -r ${rev}:HEAD -v | sed -n "/$1/,/-----\$/ p" )
+		r=$( cd ${dir}; svn log -r ${rev}:HEAD -v | sed -n "/^r[0-9]\+ [|] [^ \t]*$user[^ \t]* [|] /,/-----\$/ p" )
 		if [ "$r" != "" ]; then
 			echo "=== $i ==="
 			echo "$r"
