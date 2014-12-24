@@ -211,11 +211,11 @@ read mso platform mode <<< "$target"
 IFS=$old_ifs
 
 case $target in
-	cvc-c5320-*|cvc-samsung-*|cvc-humax-*)
-		cpu=mips
-		;;
-	*) die "Unknown CPU $target"
-		;;
+	*-c5320-*|*-samsung-*|*-humax-*|*-humaxwb-*)
+		cpu=mips;;
+	*-samsung4k-*|*-humax4k-*)
+		cpu=arm;;
+	*) die "Unknown CPU $target";;
 esac
 
 # normalize destination url

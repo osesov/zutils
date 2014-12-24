@@ -44,12 +44,11 @@ function use-target()
 	IFS=$old_ifs
 
 	case $target in
-		cvc-c5320-*|cvc-samsung-*|cvc-humax-*)
+		*-c5320-*|*-samsung-*|*-humax-*|*-humaxwb-*)
 			cpu=mips;;
-		charter-humaxwb-*)
-			cpu=mips;;
-		*) die "Unknown CPU $target"
-			;;
+		*-samsung4k-*|*-humax4k-*)
+			cpu=arm;;
+		*) die "Unknown CPU $target";;
 	esac
 }
 
