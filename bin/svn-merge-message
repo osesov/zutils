@@ -1,0 +1,97 @@
+#rev='
+#   Merged /branches/CVC_UI_10_FSP_DEV:r1120-1125,1128-1157,1159,1161,1163,1166,1168,1170,1172-1188,1190-1191,1193-1199,1201-1203,1205,1207-1216,1218-1256,1258-1259,1263-1274,1276-1322,1324-1354
+#   Merged /trunk:r944-945,950,952-956,959,963-964,966,968,970-972,976-979,983,992-994,996-997,999,1001,1005,1007,1010,1012-1018,1020-1021,1029,1031-1032,1039,1041-1042,1044,1048-1054,1056-1057,1060,1063,1065-1066,1068-1069,1071,1073-1074,1076-1085,1087,1089-1096,1100,1102,1104-1105,1107-1108,1117-1119
+#'
+
+declare -A tags
+
+root=$(svn info | grep "^Repository Root:" | awk '{print $3}')
+#echo $root
+rev=$(svn diff . | grep "   Merged /")
+
+commitinfo=$1
+
+function checkrev()
+{
+	# ------------------------------------------------------------------------
+	# r1349 | oleg.sesov | 2015-01-12 09:56:18 -0500 (Mon, 12 Jan 2015) | 1 line
+	#
+	# #SkyUI_RDK-154:vct_id i timezone issue support:Information for QA - "fix POWER_STATE argument"
+	# ------------------------------------------------------------------------
+	local line
+	msg=$(svn log $root$branch -r $1 | sed -e '1,2d' -e '$d' | sed -e '1{/^$/d}' -e '${/^$/d}' )
+	if [ -z "$msg" ]; then
+		return
+	fi
+
+	if [[ "$msg" =~ auto\ version\ updater\ for\ build ]]; then
+		return
+	fi
+	
+	tag=
+	printf "Merge: %s:r%d\n" "$branch" "$1"
+
+#	echo "DBG $msg"
+	while read line; do
+		# >>> #SelfHel-460:Self-Healing:  DTS transport modification for metrics support:Information for QA - "interface changes"
+		if [[ "$line" =~ ^\#([^:]+):.*:Information\ for\ QA\ -\ \"(.*)\"$ ]]; then
+			task=${BASH_REMATCH[1]}
+			qainfo=${BASH_REMATCH[2]}
+			tags[$task]="$task"
+#			tag="task:$task:notresolve:qainfo=$qainfo"
+		fi
+		echo " >> $line"
+#	echo "DBG -- $line"
+	done < <( echo "$msg" )
+
+	if [ -n "$tag" ]; then
+		echo "$tag"
+	fi
+	echo ""
+	echo ""
+
+#	echo "### ${#tags[@]}"
+#	if [ "${#tags[@]}" -ge "3" ]; then
+#		return 1;
+#	else
+#		return 0;
+#	fi
+}
+
+for i in $rev; do
+#	echo "--- $i"
+
+	if [[ "$i" =~ (.+):r(.+)$ ]]; then
+		branch=${BASH_REMATCH[1]}
+		revlist=${BASH_REMATCH[2]}
+		revlist=${revlist//,/ }
+
+#		echo $branch
+#		echo $revlist
+
+		for r in $revlist; do
+
+			if [[ "$r" =~ ([0-9]+)-([0-9]+) ]]; then
+				
+				c=${BASH_REMATCH[1]}
+				e=${BASH_REMATCH[2]}
+				checkrev $c
+
+				while (($c != $e)); do
+					c=$((c+1))
+					if ! checkrev $c; then break; fi
+				done
+
+			else
+				if ! checkrev $r; then break; fi
+			fi
+		done
+	fi
+
+done
+
+
+#build tags
+for i in ${tags[@]}; do
+	echo "task:$i:notresolve:qainfo=$commitinfo"
+done
