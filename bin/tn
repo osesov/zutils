@@ -16,7 +16,7 @@ multiarg=
 
 if [ "$mode" = "tn" ]; then
     case $1 in
-    cmd2k|zget|zwalk|set)
+    cmd2k|snmpget|snmpwalk|set)
 	mode=$1
 	shift
 	;;
@@ -30,7 +30,7 @@ case $mode in
 	use_ip=yes;
 	addr=ip;;
 
-    cmd2k|zget|zwalk)
+    cmd2k|snmpget|snmpwalk)
 	multiarg=yes
 	use_ip=yes
 	addr=ip;;
@@ -52,7 +52,7 @@ while test $# -ne 0; do
 	-sling) [ -z "$use_ip" ] && addr=sling;;
 	-*) die "unknosn option $i";;
 	@*) box=${i:1};;
-	*) [ -n "$multiarg" ] || die "Extra arguments"; break;
+	*) [ -n "$multiarg" ] || die "Extra arguments: $i"; break;
 	esac
 
 	shift
@@ -92,11 +92,11 @@ case "$mode" in
 	exec telnet $addr
 	;;
 
-    zwalk)
+    snmpwalk)
 	snmpwalk -v 2c -c CvC0ms $addr:161 $*
 	;;
 
-    zget)
+    snmpget)
 	snmpget -v 2c -c CvC0ms $addr:161 $*
 	;;
 
