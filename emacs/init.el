@@ -1,9 +1,11 @@
-;; link this to ~/.emacs
+;; link this to ~/.emacs.d/init.el
 
 (add-to-list 'load-path "~/zutils/emacs")
 (require 'psvn)
 
 (setq user-mail-address "oleg.sesov@dev.zodiac.tv")
+
+(defalias 'yes-or-no-p 'y-or-n-p)
 
 ;; C-mode
 (require 'cc-mode)
