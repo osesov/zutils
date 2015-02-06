@@ -8,8 +8,16 @@ declare -A tags
 root=$(svn info | grep "^Repository Root:" | awk '{print $3}')
 #echo $root
 rev=$(svn diff . | grep "   Merged /")
+output=commit.txt
 
 commitinfo=$1
+[ -f $output ] && rm $output
+
+function putline()
+{
+	local fmt=$1; shift
+	printf "$fmt\n" $* | tee -a $output
+}
 
 function checkrev()
 {
@@ -29,7 +37,7 @@ function checkrev()
 	fi
 	
 	tag=
-	printf "Merge: %s:r%d\n" "$branch" "$1"
+	putline "Merge: %s:r%d" "$branch" "$1"
 
 #	echo "DBG $msg"
 	while read line; do
@@ -40,15 +48,15 @@ function checkrev()
 			tags[$task]="$task"
 #			tag="task:$task:notresolve:qainfo=$qainfo"
 		fi
-		echo " >> $line"
+		putline " >> $line"
 #	echo "DBG -- $line"
 	done < <( echo "$msg" )
 
 	if [ -n "$tag" ]; then
-		echo "$tag"
+		putline "$tag"
 	fi
-	echo ""
-	echo ""
+	putline ""
+	putline ""
 
 #	echo "### ${#tags[@]}"
 #	if [ "${#tags[@]}" -ge "3" ]; then
@@ -93,5 +101,5 @@ done
 
 #build tags
 for i in ${tags[@]}; do
-	echo "task:$i:notresolve:qainfo=$commitinfo"
+	putline "task:$i:notresolve:qainfo=$commitinfo"
 done
