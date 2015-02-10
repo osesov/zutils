@@ -86,7 +86,7 @@ function gensymbols-stripped()
 			fi
 
 			read module os arch hash name < <(head -n1 $sym)
-			echo "cp -vu $sym ${symdir}/$name/$hash/ (" $(head -n1 $sym) ")"
+#			echo "cp -vu $sym ${symdir}/$name/$hash/ (" $(head -n1 $sym) ")"
 			mkdir -p ${symdir}/$name/$hash/
 			cp -vu $sym ${symdir}/$name/$hash/
 		fi
