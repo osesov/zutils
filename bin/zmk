@@ -80,10 +80,13 @@ function gensymbols-stripped()
 				echo "Generate symbols $i => $sym"
 #				mipsel-linux-strip -s $i
 				dump_syms $i 2> >(grep -v 'file contains no debugging information') > $sym
+			else
 				read module os arch hash name < <(head -n1 $sym)
-				mkdir -p ${symdir}/$name/$hash/
-				cp -u $sym ${symdir}/$name/$hash/
 			fi
+
+#			echo "cp -vu $sym ${symdir}/$name/$hash/"
+			mkdir -p ${symdir}/$name/$hash/
+			cp -vu $sym ${symdir}/$name/$hash/
 		fi
 	done
 }
