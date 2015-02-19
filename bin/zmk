@@ -88,7 +88,7 @@ function gensymbols-stripped()
 			read module os arch hash name < <(head -n1 $sym)
 #			echo "cp -vu $sym ${symdir}/$name/$hash/ (" $(head -n1 $sym) ")"
 			mkdir -p ${symdir}/$name/$hash/
-			cp -vu $sym ${symdir}/$name/$hash/
+			cp -u $sym ${symdir}/$name/$hash/
 		fi
 	done
 }
@@ -105,9 +105,15 @@ function mksymbols-stripped()
 
 function stackwalk()
 {
+	local name
 #	mksymbols
-	ls -l ../symbols/${platform}-${cpu}-${mso}/${mode}
-	minidump_stackwalk $1 ../symbols/${platform}-${cpu}-${mso}/${mode} 2> $1.info | grep -v "[a-z][a-z0-9] = \|Found by:" | mipsel-linux-c++filt > $1.text
+#	ls -l ../symbols/${platform}-${cpu}-${mso}/${mode}
+	case $1 in
+	*.gz) gunzip $1; name=${1%%.gz};;
+	*) name=$1;
+	esac
+    
+	minidump_stackwalk $name ../symbols/${platform}-${cpu}-${mso}/${mode} 2> $name.info | grep -v "[a-z][a-z0-9] = \|Found by:" | mipsel-linux-c++filt > $name.text
 }
 
 function show-status()
@@ -348,28 +354,24 @@ project)
 
 esac
 
-found=no
-for p in $dir_list; do
-    if [ -f $p/$makefile ]; then
-	found=yes
-	break
-    fi
+p=`pwd`
+while [ "$p" != "/" ]; do
+	for dir in . $dir_list; do
+		if [ -f $p/$dir/$makefile ]; then
+			found=yes
+			break 2
+		fi
+	done
+	p=`dirname $p`
 done
 
-if [ "$found" != "yes" ]; then
-    p=`pwd`
-    while [ "$p" != "/" -a ! -f "$p/$makefile" ]; do
-	p=`dirname $p`
-    done
-fi
-
-if [ ! -f "$p/$makefile" ]; then
+if [ ! -f "$p/$dir/$makefile" ]; then
 	echo "$makefile not found"
 	exit 1
 fi
 
-echo "Using dir: $p"
-cd $p
+echo "Using dir: $p/$dir"
+cd $p/$dir
 
 # export ENABLE_DEBUG_SYMBOLS=1
 #export LDFLAGS=-g
