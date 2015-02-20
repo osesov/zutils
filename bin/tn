@@ -6,9 +6,11 @@ function die()
 	exit 1
 }
 
+confdir=${XDG_CACHE_HOME:-$HOME/.config}/tn
+boxlist=$confdir/box
 addr=ip
 box=
-boxdir=~/.box
+boxdir=$confdir
 curbox=$boxdir/current
 mode=${0##*/}
 use_ip=
@@ -16,7 +18,7 @@ multiarg=
 
 if [ "$mode" = "tn" ]; then
     case $1 in
-    cmd2k|snmpget|snmpwalk|set)
+    cmd2k|snmpget|snmpwalk|set|getfile)
 	mode=$1
 	shift
 	;;
@@ -30,7 +32,7 @@ case $mode in
 	use_ip=yes;
 	addr=ip;;
 
-    cmd2k|snmpget|snmpwalk)
+    cmd2k|snmpget|snmpwalk|getfile)
 	multiarg=yes
 	use_ip=yes
 	addr=ip;;
@@ -58,21 +60,41 @@ while test $# -ne 0; do
 	shift
 done
 
+#read box info
 newbox=$boxdir/$box
 
 if [ -z "$box" ]; then
-    [ -f "$curbox" ] || die "No current box defined"
-elif [ -f "$newbox" ]; then
-    ln -sf "$newbox" "$curbox"
-else
-    die "box $box not found in $boxdir"
+    if [ -f "$curbox" ]; then
+	box=$(cat "$curbox")
+    else
+	die "No box specified"
+    fi
 fi
 
-cur=$(readlink $curbox)
-box=${cur##*/}
+boxes=$(cat "$boxlist")
+while IFS=':' read -ra BOX; do
+    name=${BOX[0]}
+    case $name in
+    \#*)
+	;;
 
+    $box)
+	if [ "$found" != "yes" ]; then
+		found=yes
+		ip=${BOX[1]}
+		rf=${BOX[2]}
+		sling=${BOX[3]}
+	fi
+	;;
+    esac
+done <<< "$boxes"
+
+if [ "$found" != "yes" ]; then
+    die "Box '$box' is not found in $boxlist"
+fi
+
+echo "$box" > "$curbox"
 echo "Using box: $box"
-source $curbox
 
 addr=${!addr}
 [ -n "$addr" ] || die "Address for $mode is not defined"
@@ -101,5 +123,25 @@ case "$mode" in
 	;;
 
     set);;
+
+    getfile)
+	for i in "$*"; do
+	    file=$i
+	    out=${file##*/}.rmt
+
+	    expect \
+	        -c "spawn telnet $addr" \
+	        -c 'expect "*?login:*"' \
+	        -c 'send "root\r"' \
+	        -c 'expect "*$ "' \
+		-c 'send "stty -echo\r"' \
+	        -c 'expect "*$ "' \
+	        -c "send \"[ -f $file ] && (echo BEGIN;hexdump -ve \'/1 \\\"%02X\\\"\' $file;echo;echo END)\r\"" \
+	        -c 'expect "*$ "' \
+		| awk '/END/{p=0;} { if (p) print $0; } /BEGIN/ {p=1;}; ' \
+	        | xxd -r -p - "$out"
+
+	done
+	;;
 esac
 
