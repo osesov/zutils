@@ -111,7 +111,13 @@ case "$mode" in
     tn)
 	ping -w90 -c1 $addr || die "Unabe to ping box"
 	sleep 0.5
-	exec telnet $addr
+//	exec telnet $addr
+	expect \
+	    -c "spawn telnet $addr" \
+	    -c 'expect "*?login:*"' \
+	    -c 'send "root\r"' \
+	    -c 'expect -re *[$#] "' \
+	    -c 'interact' \
 	;;
 
     snmpwalk)
