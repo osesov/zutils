@@ -116,7 +116,7 @@ case "$mode" in
 	    -c "spawn telnet $addr" \
 	    -c 'expect "*?login:*"' \
 	    -c 'send "root\r"' \
-	    -c 'expect -re *[$#] "' \
+	    -c 'expect -re ".*($|#) "' \
 	    -c 'interact' \
 	;;
 
@@ -139,11 +139,11 @@ case "$mode" in
 	        -c "spawn telnet $addr" \
 	        -c 'expect "*?login:*"' \
 	        -c 'send "root\r"' \
-	        -c 'expect "*9$#] "' \
+	        -c 'expect -re ".*($|#) "' \
 		-c 'send "stty -echo\r"' \
-	        -c 'expect "*[$#] "' \
+	        -c 'expect -re ".*($|#) "' \
 	        -c "send \"[ -f $file ] && (echo BEGIN;hexdump -ve \'/1 \\\"%02X\\\"\' $file;echo;echo END)\r\"" \
-	        -c 'expect "*[$#] "' \
+	        -c 'expect -re ".*($|#) "' \
 		| awk '/END/{p=0;} { if (p) print $0; } /BEGIN/ {p=1;}; ' \
 	        | xxd -r -p - "$out"
 
