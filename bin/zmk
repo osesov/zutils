@@ -3,9 +3,11 @@
 unset LANG
 
 sln=PowerUp.sln
-config=~/bin/.zmk.config
+confdir=${XDG_CACHE_HOME:-$HOME/.config}/zmk
+config=${confdir}/zmk.config
 
-[ -f $config ] && source $config
+[ -d "$confdir" ] || mkdir -p "$confdir"
+[ -f "$config" ] && source "$config"
 
 function die()
 {
