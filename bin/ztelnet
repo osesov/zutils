@@ -1,0 +1,23 @@
+#!/usr/bin/expect -f
+
+set timeout 20
+set ip       [lindex $argv 0]
+set port     [lindex $argv 1]
+set user     [lindex $argv 2]
+set password [lindex $argv 3]
+
+proc abort {msg} {
+    send_user "Login failed: $msg"
+    exit
+}
+
+spawn telnet $ip $port
+expect "'^]'."
+expect {
+	-nocase "login:"               { send "$user\r";     exp_continue; }
+	-nocase "password:"            { send "$password\r"; exp_continue; }
+	-nocase "\[$#] "               { interact; }
+	-nocase "telnet: "             { abort "Error" }
+	-nocase "host: "               { abort "Error" }
+}
+

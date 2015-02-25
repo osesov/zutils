@@ -1,0 +1,57 @@
+#!/usr/bin/expect -f
+
+set timeout 20
+set ip       [lindex $argv 0]
+set port     [lindex $argv 1]
+set user     [lindex $argv 2]
+set password [lindex $argv 3]
+set file     [lindex $argv 4]
+set out      [lindex $argv 5]
+
+proc abort {msg} {
+    send_user "zgetfile failed: $msg\n"
+    exit
+}
+
+proc hex2str hex {
+#    foreach c [split $hex ""] {
+#        if {![string is xdigit $c]} {
+#            abort "#invalid $hex"
+#        }
+#    }
+    binary format H* $hex
+}
+
+spawn telnet $ip $port
+expect "'^]'."
+expect {
+	-nocase "login:"               { send "$user\r";     exp_continue; }
+	-nocase "password:"            { send "$password\r"; exp_continue; }
+	-nocase "telnet: "             { abort "Error" }
+	-nocase "host: "               { abort "Error" }
+	-nocase "\[$#] "               { }
+}
+
+send   "stty -echo\r"
+expect "\[$#] "
+
+send "hexdump -ve '\"X \" 32/1 \"%02X\" \"\\n\" ' $file && echo EOF || echo ERROR\r"
+
+set outputfd [open "$out" "w" 0666 ] ; 
+fconfigure $outputfd -translation binary
+log_user 0
+
+send_user "Downloading...\n"
+expect {
+    -re "^X (\[0-9A-F]+)\r\n"      {
+	puts -nonewline $outputfd "[hex2str $expect_out(1,string)]";
+#	puts $outputfd $expect_out(1,string);
+	exp_continue
+    }
+    EOF                 {}
+    ERROR		{ abort "Error while downloading file" }
+}
+
+close $outputfd
+log_user 1
+send_user "Done\n"

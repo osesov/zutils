@@ -111,13 +111,8 @@ case "$mode" in
     tn)
 	ping -w90 -c1 $addr || die "Unabe to ping box"
 	sleep 0.5
-//	exec telnet $addr
-	expect \
-	    -c "spawn telnet $addr" \
-	    -c 'expect "*?login:*"' \
-	    -c 'send "root\r"' \
-	    -c 'expect -re ".*($|#) "' \
-	    -c 'interact' \
+#	exec telnet $addr
+        exec $(dirname $0)/ztelnet $addr telnet root wb@humax
 	;;
 
     snmpwalk)
@@ -131,23 +126,9 @@ case "$mode" in
     set);;
 
     getfile)
-	for i in "$*"; do
-	    file=$i
-	    out=${file##*/}.rmt
-
-	    expect \
-	        -c "spawn telnet $addr" \
-	        -c 'expect "*?login:*"' \
-	        -c 'send "root\r"' \
-	        -c 'expect -re ".*($|#) "' \
-		-c 'send "stty -echo\r"' \
-	        -c 'expect -re ".*($|#) "' \
-	        -c "send \"[ -f $file ] && (echo BEGIN;hexdump -ve \'/1 \\\"%02X\\\"\' $file;echo;echo END)\r\"" \
-	        -c 'expect -re ".*($|#) "' \
-		| awk '/END/{p=0;} { if (p) print $0; } /BEGIN/ {p=1;}; ' \
-	        | xxd -r -p - "$out"
-
-	done
+        file=$1
+	out=${2:-${file##*/}.rmt}
+        $(dirname $0)/zgetfile "$addr" telnet root wb@humax "$file" "$out"
 	;;
 esac
 
