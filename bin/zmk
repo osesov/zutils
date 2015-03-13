@@ -115,7 +115,8 @@ function stackwalk()
 	*) name=$1;
 	esac
     
-	minidump_stackwalk $name ../symbols/${platform}-${cpu}-${mso}/${mode} 2> $name.info | grep -v "[a-z][a-z0-9] = \|Found by:" | mipsel-linux-c++filt > $name.text
+#	minidump_stackwalk $name ../symbols/${platform}-${cpu}-${mso}/${mode} 2> $name.info | grep -v "[a-z][a-z0-9] = \|Found by:" | mipsel-linux-c++filt > $name.text
+	minidump_stackwalk $name ../symbols/${platform}-${cpu}-${mso}/${mode} 2> $name.info > $name.text
 }
 
 function show-status()

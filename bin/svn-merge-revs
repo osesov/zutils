@@ -7,11 +7,11 @@ function die()
 }
 
 source "$config" || die "unable to find: $config"
-[ -n "$PARENT" ] || dir "PARENT is not set"
+[ -n "$MERGE" ] || dir "MERGE is not set"
 
 svn up > /dev/null
 
-opts="^/$PARENT ."
+opts="^/$MERGE ."
 
 for i in $*; do
     case $i in
