@@ -1,5 +1,5 @@
-BIN_FILES=bin/zmk bin/zupload bin/svn-list-commits bin/update-group-cfg bin/tn bin/svn-merge-message bin/ztelnet bin/zgetfile
+BIN_FILES=zmk zupload svn-list-commits update-group-cfg tn svn-merge-message svn-merge-list svn-merge-revs ztelnet zgetfile
 
 install:
-	@for i in $(BIN_FILES); do echo "$$i..."; ln -sf `pwd`/$$i ~/bin/; done
+	@for i in $(BIN_FILES); do echo "$$i..."; ln -sf `pwd`/bin/$$i ~/bin/; done
 	ln -sf `pwd`/bin/tn ~/bin/cmd2k
