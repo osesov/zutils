@@ -1,0 +1,61 @@
+config=svn.config
+
+function die()
+{
+    echo $*
+    exit 1
+}
+
+source "$config" || die "unable to find: $config"
+[ -n "$MERGE" ] || dir "MERGE is not set"
+
+declare -A tasks
+branch=^/$MERGE
+
+echo "$branch"
+
+function flush()
+{
+	if [ -n "$revlist" ]; then
+		echo $revlist -- $lc
+	fi
+	unset revlist
+	unset lc
+}
+
+[ -f log ] && rm -rf log
+
+# for rev in 1375 1376 1377 1378 1379; do
+for rev in $(svn mergeinfo --show-revs eligible $branch .); do
+	rev=${rev#r}
+	unset tasks
+	while read line; do
+
+		if [[ "$line" =~ ^\#([^:]+):.*:Information\ for\ QA\ -\ \"(.*)\"$ ]]; then
+			t=${BASH_REMATCH[1]}
+			qi=${BASH_REMATCH[2]}
+			if [ -n "$tasks" ]; then
+				tasks+=" "
+			fi
+			tasks+="$t"
+#			echo "$rev $t"
+		fi
+
+	done < <(svn log $branch -c${rev} | grep "^#")
+
+	echo "$rev: $tasks" >> log
+	if [ -z "$tasks" ]; then
+		continue
+#		flush
+#		echo "$rev"
+	elif [ "$tasks" != "$lc" ]; then
+		flush
+		revlist="$rev"
+		lc="$tasks"
+	else
+		revlist+=" $rev"
+	fi
+
+done
+
+flush

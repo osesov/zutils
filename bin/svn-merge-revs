@@ -1,0 +1,34 @@
+config=svn.config
+
+function die()
+{
+    echo $*
+    exit 1
+}
+
+source "$config" || die "unable to find: $config"
+[ -n "$PARENT" ] || dir "PARENT is not set"
+
+svn up > /dev/null
+
+opts="^/$PARENT ."
+
+for i in $*; do
+    case $i in
+    -*) opts+=" $i";;
+
+    *)
+	IFS=',' read -a revs <<< "$i"
+
+	for el in "${revs[@]}"; do
+		if [[ $i =~ ([0-9]+)-(0-9]+) ]]; then
+			for rev in `seq ${BASH_REMATCH[1]} e=${BASH_REMATCH[2]}`; do
+				svn merge $opts -c $rev
+			done
+		else
+			svn merge $opts -c $el
+		fi
+	done
+	;;
+    esac
+done
