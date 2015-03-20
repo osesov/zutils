@@ -7,7 +7,7 @@ function die()
 }
 
 source "$config" || die "unable to find: $config"
-[ -n "$MERGE" ] || dir "MERGE is not set"
+[ -n "$MERGE" ] || die "MERGE is not set"
 
 declare -A tasks
 branch=^/$MERGE
