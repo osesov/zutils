@@ -1,0 +1,13 @@
+#!/bin/bash
+
+set +x
+
+while true; do
+    case $1 in
+    *=*) configure="$configure $1"; shift;;
+    *) configure="$configure $1"; shift; break;;
+    esac
+done
+
+CC=mipsel-linux-gcc \
+    $configure --host=mipsel-linux --build=i686-pc-linux-gnu --prefix=/opt/mipsel-linux $*
