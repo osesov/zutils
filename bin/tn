@@ -18,7 +18,7 @@ multiarg=
 
 if [ "$mode" = "tn" ]; then
     case $1 in
-    cmd2k|snmpget|snmpwalk|set|getfile)
+    cmd2k|snmpget|snmpwalk|set|getfile|reboot|powerup)
 	mode=$1
 	shift
 	;;
@@ -28,7 +28,7 @@ fi
 case $mode in
     set) ;;
 
-    tn)
+    tn|reboot|powerup)
 	use_ip=yes;
 	addr=ip;;
 
@@ -100,6 +100,14 @@ addr=${!addr}
 [ -n "$addr" ] || die "Address for $mode is not defined"
 echo "Address: $addr($mode)"
 
+function xtelnet()
+{
+	ping -w90 -c1 $addr || die "Unabe to ping box"
+	sleep 0.5
+#	exec telnet $addr
+        exec $(dirname $0)/ztelnet $addr telnet root wb@humax $1
+}
+
 case "$mode" in 
     sling)
 	;;
@@ -108,12 +116,10 @@ case "$mode" in
 	cmd2000 $addr "$*" 2>/dev/null # | cut -b46-
 	;;
 
-    tn)
-	ping -w90 -c1 $addr || die "Unabe to ping box"
-	sleep 0.5
-#	exec telnet $addr
-        exec $(dirname $0)/ztelnet $addr telnet root wb@humax
-	;;
+    tn)      xtelnet;;
+    reboot)  xtelnet reboot;;
+    powerup) xtelnet powerup;;
+
 
     snmpwalk)
 	snmpwalk -v 2c -c CvC0ms $addr:161 $*
