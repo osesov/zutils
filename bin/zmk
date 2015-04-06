@@ -3,7 +3,7 @@
 unset LANG
 
 sln=PowerUp.sln
-confdir=${XDG_CACHE_HOME:-$HOME/.config}/zmk
+confdir=${XDG_CONFIG_HOME:-$HOME/.config}/zmk
 config=${confdir}/zmk.config
 os=$(uname -s | tr [:upper:] [:lower:])
 

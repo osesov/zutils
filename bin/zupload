@@ -2,7 +2,10 @@
 
 # set -x
 
-config=~/bin/.zmk.config
+confdir=${XDG_CONFIG_HOME:-$HOME/.config}/zmk
+cachedir=${XDG_CACHE_HOME:-$HOME/.cache}/zupdate
+config=${confdir}/zmk.config
+
 [ -f $config ] && source $config
 
 if [ -z "$dest" ]; then
@@ -57,7 +60,7 @@ function curl.publish_begin()
 	curl_server=${dst#*://}
 	curl_server=${curl_server%%/*}
 
-	curl_tmpdir=${HOME-/var}/tmp/zupdate/${curl_server}
+	curl_tmpdir=${cachedir}/${curl_server}
 	curl_modefile=${curl_tmpdir}/mode
 	curl_newmode="$platform-$cpu-$mso-$mode"
 

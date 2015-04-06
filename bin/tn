@@ -6,7 +6,7 @@ function die()
 	exit 1
 }
 
-confdir=${XDG_CACHE_HOME:-$HOME/.config}/tn
+confdir=${XDG_CONFIG_HOME:-$HOME/.config}/tn
 boxlist=$confdir/box
 addr=ip
 box=
