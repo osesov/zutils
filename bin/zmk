@@ -5,6 +5,7 @@ unset LANG
 sln=PowerUp.sln
 confdir=${XDG_CACHE_HOME:-$HOME/.config}/zmk
 config=${confdir}/zmk.config
+os=$(uname -s | tr [:upper:] [:lower:])
 
 [ -d "$confdir" ] || mkdir -p "$confdir"
 [ -f "$config" ] && source "$config"
@@ -13,6 +14,17 @@ function die()
 {
     echo "$@"
     exit 1
+}
+
+function trace()
+{
+    echo "$*"
+}
+
+function debug()
+{
+#    echo "$*"
+    :
 }
 
 function save-config()
@@ -190,10 +202,174 @@ function checkout()
 	done
 }
 
+function common-prefix()
+{
+	local n=0
+	local x=$((${#1}<${#2}?${#1}:${#2}))
+	local s=0
+#	echo -ne $x:
+	while [[ ($n -lt $x) && ("${1:n:1}" == "${2:n:1}") ]]; do
+		if [[ ${1:n:1} == '/' ]]; then
+			s=$n
+		fi
+		((n++))
+#		echo -ne "[$n ${1:n:1}" "${2:n:1}]"
+	done
+	echo "${1:0:$s}"
+}
+
+function realpath()
+{
+#    pushd "$1" | cut -d ' ' -f 1
+    cd "$1" && pwd
+}
+
+
+function build-sln-entry()
+{
+    local dir=$1
+    local target=$2
+
+    if [ "$dryrun" != "yes" ]; then
+	(
+		cd $dir
+		echo Build $dir
+		bash ./make.sh $target || exit 1
+	) || return 1
+	else
+		echo "build $target in $dir"
+	fi
+}
+
+function build-solution()
+{
+	local X
+	local TEMP
+	local params
+	local build
+	local curdir=$(realpath $1)/
+	local slndir=$(pwd)
+	local dir
+	local build_prefix=0
+	local target=$2
+
+	declare -A params
+	declare -A build
+	[ -f solution ] || die "'solution' file is not found"
+
+	if [[ $scope = "project" ]]; then
+		# save one level of directory from curdir
+		curdir=${curdir#$slndir/}   # strip $slndir from the left
+		curdir=${curdir%%/*}        # strip all the path names from the right, except first one
+		curdir=${slndir}/${curdir}/ # combine the upper level project name
+	fi
+
+	while read a || [ -n "$a" ]; do
+		params=()
+		[ "${a:0:1}" != "#" ] || continue
+		debug
+		read -ra INFO <<< "$a"
+		params[DIR]="${INFO[0]}"
+		dir="${INFO[0]}"
+		unset INFO[0]
+		for i in "${INFO[@]}"; do
+			case $i in
+			PARAMS=*)
+				IFS=',' read -ra TEMP <<< "${i#PARAMS=}"
+				for j in "${TEMP[@]}"; do
+					IFS=':' read -ra X <<< "${j}"
+					params[${X[0]}]=${X[1]}
+				done
+				;;
+			*)
+				IFS='=' read -ra TEMP <<< "$i"
+				params[${TEMP[0]}]=${TEMP[1]}
+				;;
+			esac
+		done
+
+		debug "check solution line: '$a'"
+		debug "dir: $dir"
+		for i in "${!params[@]}"; do
+			debug "$i -> ${params[$i]}"
+		done
+
+		if [ -n "${params[dontbuild]+abc}"  ]; then
+			debug "dontbuild flag is set, do not build"
+			continue
+		fi
+
+		if [ "${params[os]:-$os}" != "$os" ]; then
+			debug "OS doesn't match (curent: $s, expected ${params[os]}), do not build"
+			continue
+		fi
+
+		dir="${params[copath]:-$dir}"
+		if [ ! -d "$dir" ]; then
+			debug "target path doesn't exist"
+			continue
+		fi
+
+		case $scope in
+		world)
+			build[${#build[*]}]="$dir"
+			continue
+			;;
+		esac
+
+		dir=$(realpath $dir)/
+		prefix=$(common-prefix $dir $curdir)
+		n=${#prefix}
+		debug "check  '$dir'"
+		debug "curdir '$curdir'"
+		debug "slndir '$slndir'/${#slndir}"
+		debug "prefix '$prefix'/${n}"
+
+		if [[ "$dir" = "$prefix" ]]; then	# full match
+			debug "exact match"
+			if ! build-sln-entry $dir  $target; then
+				exit 1
+			fi
+			return;
+		fi
+
+		# check for partial match
+		if [ $n -lt ${#slndir} ]; then
+			debug "match in another dir, do not build"
+			continue
+		fi
+
+		## append to build queue
+		if [ $n -lt $build_prefix ]; then
+			debug "match is shorter, do not build"
+			continue;
+		fi
+
+		if [ $n -gt $build_prefix ]; then
+			debug "found longer match, reset queue"
+			build_prefix=$n
+			build=()
+		fi
+
+		build[${#build[*]}]="$dir"
+		debug "append $dir to queue"
+
+	done < solution
+
+	for i in "${build[@]}"; do
+		if ! build-sln-entry $i $target; then
+			exit 1
+		fi
+	done
+
+}
+
 function make-sh()
 {
     case $1 in
-    build)      bash ./make.sh $2 || exit 1
+    build)
+		build-solution $curdir $2 || exit 1
+#		bash ./make.sh $2 || exit 1
 		if [ "$scope" == "world" ]; then
 			if [ "$mode" == "dbg" ]; then
 			    mksymbols
@@ -302,6 +478,10 @@ while test $# -ne 0; do
 		action=$i
 		;;
 
+	--dry-run|-n)
+		dryrun=yes
+		;;
+
 	--*|-*)
 		echo "Unknown option $i";
 		exit 1
@@ -344,37 +524,47 @@ world)
 	;;
 
 module)
-	makefile=make.sh
+	makefile=solution
 	build=make-sh
 	echo "*** build module ***"
 	;;
 
 project)
-	makefile=../PowerUp.sln
+	makefile=PowerUp.sln
 	build=make-sh
 	echo "*** build project ***"
 	;;
 
 esac
 
-p=`pwd`
+curdir=$(pwd)
+p=$(pwd)
 while [ "$p" != "/" ]; do
-	for dir in . $dir_list; do
+	if [ -f $p/$makefile ]; then
+		found=yes
+		break 1
+	fi
+	for dir in $dir_list; do
 		if [ -f $p/$dir/$makefile ]; then
 			found=yes
+			p=$p/$dir
 			break 2
 		fi
 	done
 	p=`dirname $p`
 done
 
-if [ ! -f "$p/$dir/$makefile" ]; then
+#curdir=${curdir#$p/}
+echo slndir: $p
+echo curdir: $curdir
+
+if [ ! -f "$p/$makefile" ]; then
 	echo "$makefile not found"
 	exit 1
 fi
 
-echo "Using dir: $p/$dir"
-cd $p/$dir
+echo "Using dir: $p"
+cd $p
 
 # export ENABLE_DEBUG_SYMBOLS=1
 #export LDFLAGS=-g
