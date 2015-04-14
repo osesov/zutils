@@ -227,17 +227,14 @@ function realpath()
 
 function build-sln-entry()
 {
-    local dir=$1
-    local target=$2
+	local dir=$1
+	local target=$2
 
-    if [ "$dryrun" != "yes" ]; then
+	if [ "$dryrun" != "yes" ]; then
 	(
 		cd $dir
-		echo Build $dir
 		bash ./make.sh $target || exit 1
 	) || return 1
-	else
-		echo "build $target in $dir"
 	fi
 }
 
@@ -247,14 +244,16 @@ function build-solution()
 	local TEMP
 	local params
 	local build
+	local skip
 	local curdir=$(realpath $1)/
 	local slndir=$(pwd)
 	local dir
 	local build_prefix=0
 	local target=$2
+	local cur
+	local build_mode=regular
 
 	declare -A params
-	declare -A build
 	[ -f solution ] || die "'solution' file is not found"
 
 	if [[ $scope = "project" ]]; then
@@ -290,32 +289,36 @@ function build-solution()
 
 		debug "check solution line: '$a'"
 		debug "dir: $dir"
+		cur=${#build[*]}
+		build[$cur]="$dir"
+		skip[$cur]=regular
+
 		for i in "${!params[@]}"; do
 			debug "$i -> ${params[$i]}"
 		done
 
-		if [ -n "${params[dontbuild]+abc}"  ]; then
+		if [ -n "${params[dontbuild]+abc}" ]; then
 			debug "dontbuild flag is set, do not build"
+			skip[$cur]=yes
 			continue
 		fi
 
 		if [ "${params[os]:-$os}" != "$os" ]; then
 			debug "OS doesn't match (curent: $s, expected ${params[os]}), do not build"
+			skip[$cur]=yes
 			continue
 		fi
 
 		dir="${params[copath]:-$dir}"
 		if [ ! -d "$dir" ]; then
 			debug "target path doesn't exist"
+			skip[$cur]=yes
 			continue
 		fi
 
-		case $scope in
-		world)
-			build[${#build[*]}]="$dir"
+		if [ "$scope" = world ]; then
 			continue
-			;;
-		esac
+		fi
 
 		dir=$(realpath $dir)/
 		prefix=$(common-prefix $dir $curdir)
@@ -327,41 +330,47 @@ function build-solution()
 
 		if [[ "$dir" = "$prefix" ]]; then	# full match
 			debug "exact match"
-			if ! build-sln-entry $dir  $target; then
-				exit 1
-			fi
-			return;
+			skip[$cur]=exact
+			build_mode=exact
 		fi
 
 		# check for partial match
 		if [ $n -lt ${#slndir} ]; then
 			debug "match in another dir, do not build"
+			skip[$cur]=yes
 			continue
 		fi
 
 		## append to build queue
 		if [ $n -lt $build_prefix ]; then
 			debug "match is shorter, do not build"
+			skip[$cur]=yes
 			continue;
 		fi
 
 		if [ $n -gt $build_prefix ]; then
 			debug "found longer match, reset queue"
 			build_prefix=$n
-			build=()
+			for k in ${!skip[@]}; do
+				if [ "$k" != "$cur" -a "${skip[$k]}" = "regular" ]; then
+					skip[$k]=yes
+				fi
+			done
 		fi
-
-		build[${#build[*]}]="$dir"
-		debug "append $dir to queue"
 
 	done < solution
 
-	for i in "${build[@]}"; do
-		if ! build-sln-entry $i $target; then
-			exit 1
+	for k in ${!skip[@]}; do
+		if [ "${skip[$k]}" = "$build_mode" ]; then
+			echo Make ${build[$k]} --- $target
+			if ! build-sln-entry ${build[$k]} $target; then
+				exit 1
+			fi
+		else
+			: echo Skip ${build[$k]}
+
 		fi
 	done
-
 }
 
 function make-sh()
