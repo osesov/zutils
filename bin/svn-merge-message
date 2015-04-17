@@ -48,8 +48,12 @@ function checkrev()
 			tags[$task]="$task"
 #			tag="task:$task:notresolve:qainfo=$qainfo"
 		fi
-		putline " >> $line"
-#	echo "DBG -- $line"
+		if [[ ${line:1:1} = ">" ]]; then
+			putline ">$line"
+		else
+			putline "> $line"
+		fi
+#		echo "DBG -- $line"
 	done < <( echo "$msg" )
 
 	if [ -n "$tag" ]; then

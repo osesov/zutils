@@ -6,29 +6,43 @@ function die()
     exit 1
 }
 
-source "$config" || die "unable to find: $config"
-[ -n "$MERGE" ] || die "MERGE is not set"
+function merge()
+{
+	local i=$1
+	local revs
 
-svn up > /dev/null
-
-opts="^/$MERGE ."
-
-for i in $*; do
-    case $i in
-    -*) opts+=" $i";;
-
-    *)
 	IFS=',' read -a revs <<< "$i"
 
 	for el in "${revs[@]}"; do
 		if [[ $i =~ ([0-9]+)-(0-9]+) ]]; then
 			for rev in `seq ${BASH_REMATCH[1]} e=${BASH_REMATCH[2]}`; do
-				svn merge $opts -c $rev
+				if ! svn merge ^/$MERGE . $opts -c $rev; then
+					die "Merge $i ($rev) failed"
+				fi
 			done
 		else
-			svn merge $opts -c $el
+			if ! svn merge ^/$MERGE . $opts -c $el; then
+				die "Merge $el failed"
+			fi
 		fi
 	done
-	;;
+
+}
+
+source "$config" || die "unable to find: $config"
+[ -n "$MERGE" ] || die "MERGE is not set"
+
+svn up > /dev/null
+
+opts=""
+
+for i in $*; do
+    case $i in
+    *=*) eval "$i";;
+    -*)    opts+=" $i";;
+
+    ~*)    merge -${i:1};;
+    *)     merge $i;;
     esac
 done
+
