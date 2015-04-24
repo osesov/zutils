@@ -6,7 +6,10 @@ set port     [lindex $argv 1]
 set user     [lindex $argv 2]
 set password [lindex $argv 3]
 set tail     [lindex $argv 4]
+set dir      [lindex $argv 5]
 
+send_user "port: $port\n"
+send_user "dir: $dir\n"
 
 if { [string compare $tail "" ] == 0} {
     set tail "defproc"
@@ -28,7 +31,9 @@ proc reboot {} {
 }
 
 proc powerup {} {
-    send "cd /home/oleg.sesov/powerup/usr/bin\r"
+    global dir
+
+    send "cd $dir\r"
     send "./run-powerup.sh\r"
     expect "\[$#] "
     interact
@@ -37,7 +42,6 @@ proc powerup {} {
 proc defproc {} {
     interact
 }
-
 
 spawn telnet $ip $port
 expect "'^]'."

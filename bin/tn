@@ -12,9 +12,12 @@ addr=ip
 box=
 boxdir=$confdir
 curbox=$boxdir/current
+config=$confdir/tn.config
 mode=${0##*/}
 use_ip=
 multiarg=
+
+source $config
 
 if [ "$mode" = "tn" ]; then
     case $1 in
@@ -61,8 +64,6 @@ while test $# -ne 0; do
 done
 
 #read box info
-newbox=$boxdir/$box
-
 if [ -z "$box" ]; then
     if [ -f "$curbox" ]; then
 	box=$(cat "$curbox")
@@ -105,7 +106,7 @@ function xtelnet()
 	ping -w90 -c1 $addr || die "Unabe to ping box"
 	sleep 0.5
 #	exec telnet $addr
-        exec $(dirname $0)/ztelnet $addr telnet root wb@humax $1
+        exec $(dirname $0)/ztelnet $addr telnet root wb@humax "$1" "$rundir"
 }
 
 case "$mode" in 
