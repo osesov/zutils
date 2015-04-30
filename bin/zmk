@@ -120,7 +120,7 @@ function mksymbols-stripped()
 function stackwalk()
 {
 	local name
-#	mksymbols
+	mksymbols-stripped
 #	ls -l ../symbols/${platform}-${cpu}-${mso}/${mode}
 	case $1 in
 	*.gz) gunzip $1; name=${1%%.gz};;
@@ -387,7 +387,7 @@ function make-sh()
 		    fi
 		fi
 		;;
-    clean)      bash ./make.sh clean-$2 ;;
+    clean)      cd ${curdir}; bash ./make.sh clean-$2 ;;
     rebuild)    make-sh clean $2 && make-sh build $2;;
     update)     cd ../.. && ./vcs.sh update;;
     set-config) save-config;;
