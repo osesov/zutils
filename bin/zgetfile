@@ -1,4 +1,4 @@
-#!/usr/bin/expect -f
+#!/usr/bin/expect -df
 
 set timeout 20
 set ip       [lindex $argv 0]
@@ -43,7 +43,7 @@ log_user 0
 
 send_user "Downloading...\n"
 expect {
-    -re "^X (\[0-9A-F]+)\r\n"      {
+    -re "^X (\[0-9A-F]+)\[ ]*\r\n"      {
 	puts -nonewline $outputfd "[hex2str $expect_out(1,string)]";
 #	puts $outputfd $expect_out(1,string);
 	exp_continue
