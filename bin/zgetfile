@@ -50,6 +50,7 @@ expect {
     }
     EOF                 {}
     ERROR		{ abort "Error while downloading file" }
+    -re "^\[^X]"        { exp_continue }
 }
 
 close $outputfd

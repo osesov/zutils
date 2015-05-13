@@ -7,6 +7,7 @@ set user     [lindex $argv 2]
 set password [lindex $argv 3]
 set tail     [lindex $argv 4]
 set dir      [lindex $argv 5]
+set exe      [lindex $argv 6]
 
 send_user "port: $port\n"
 send_user "dir: $dir\n"
@@ -32,9 +33,10 @@ proc reboot {} {
 
 proc powerup {} {
     global dir
+    global exe
 
     send "cd $dir\r"
-    send "./run-powerup.sh\r"
+    send "$exe\r"
     expect "\[$#] "
     interact
 }

@@ -106,7 +106,7 @@ function xtelnet()
 	ping -w90 -c1 $addr || die "Unabe to ping box"
 	sleep 0.5
 #	exec telnet $addr
-        exec $(dirname $0)/ztelnet $addr telnet root wb@humax "$1" "$rundir"
+        exec $(dirname $0)/ztelnet $addr telnet root wb@humax "$1" "$rundir" "${exe:-./run-powerup.sh}"
 }
 
 case "$mode" in 
@@ -134,7 +134,7 @@ case "$mode" in
 
     getfile)
         file=$1
-	out=${2:-${file##*/}.rmt}
+	out=${2:-${file##*/}}
         $(dirname $0)/zgetfile "$addr" telnet root wb@humax "$file" "$out"
 	;;
 esac
