@@ -1,4 +1,4 @@
-#!/usr/bin/expect -df
+#!/usr/bin/expect -f
 
 set timeout 20
 set ip       [lindex $argv 0]
