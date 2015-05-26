@@ -9,84 +9,14 @@ config=${confdir}/zmk.config
 [ -f $config ] && source $config
 
 if [ -z "$dest" ]; then
-    dest=ftp://ftp.developonbox.ru/common/nfsroot/root/olegs/dal
+	die "'dest' is not set"
 fi
 
-PATH=/opt/toolchains/gcc-4.2.0/bin:$PATH
 
 function die()
 {
 	echo $*
 	exit 1
-}
-
-##################################################################
-# File publishing
-
-function file.publish_begin()
-{
-	return 0
-}
-
-function file.publish_end()
-{
-	sync
-}
-
-function file.publish_file()
-{
-	local src=$1
-	local dst=${2#*://}
-	local dir=${dst%/*}
-
-	mkdir -p $dir || die "unable to create dir: $dir"
-
-	if [ ! -f "$dst" -o "$src" -nt "$dst" ]; then
-		echo " (update)"
-		mipsel-linux-objcopy --strip-unneeded "$src" "$dst" || die "Unable to copy $src into $dst"
-	else
-		echo " (skip)"
-	fi
-}
-
-###################################################################
-# curl publishing
-
-function curl.publish_begin()
-{
-	local dst=$1
-	local full_upgrade=yes
-
-	curl_server=${dst#*://}
-	curl_server=${curl_server%%/*}
-
-	curl_tmpdir=${cachedir}/${curl_server}
-	curl_modefile=${curl_tmpdir}/mode
-	curl_newmode="$platform-$cpu-$mso-$mode"
-
-	[ -d "${curl_tmpdir}" ] || mkdir -p "${curl_tmpdir}" || die "unable to create temp dir: ${curl_tmpdir}"
-    
-	if [ -f ${curl_modefile} ]; then
-		local lastmode=$(< ${curl_modefile})
-#		echo last mode:$lastmode, new mode:${curl_newmode}
-		if [ "${curl_newmode}" == "$lastmode" ]; then
-			full_upgrade=no
-		fi
-	fi
-
-	if [ "$full_upgrade" == "yes" ]; then
-		echo "Perform full upgrade"
-		rm -rf ${curl_tmpdir}/*
-	fi
-
-	echo "publish via ${curl_tmpdir}"
-#	echo "update to ${curl_newmode}"
-}
-
-function curl.publish_end()
-{
-#	echo "update to ${curl_newmode}"
-	echo ${curl_newmode} > ${curl_modefile}
 }
 
 function cksum()
@@ -97,64 +27,171 @@ function cksum()
 	fi
 }
 
-function curl.publish_file()
-{
-	local src=$1
-	local dst=$2
-	local temp=${curl_tmpdir}/${src##*/}
-	local src_cksum=$(cksum $src)
-	local imm_cksum=$(cksum $temp)
-	local opts
+##################################################################
+# File publishing
 
-	mkdir -p ${curl_tmpdir} || die "unable to create dir: ${curl_tmpdir}"
-	if [ ! -f "$temp" -o "$src" -nt "$temp" -o "$src_cksum" != "$imm_cksum" ]; then
-		echo " (update)"
-		mipsel-linux-objcopy --strip-unneeded $src $temp || die "Unable to strip $src into $temp"
+function file()
+{
+	local cmd=$1
+	case $cmd in
+	begin)
+		;;
+	end)
+		sync
+		;;
+	send)
+		local src=$2
+		local dst=${3#*://}
+		local dir=${dst%/*}
+
+		mkdir -p $dir || die "unable to create dir: $dir"
+
+		if [ ! -f "$dst" -o "$src" -nt "$dst" ]; then
+			echo " (update)"
+			${cross}objcopy --strip-unneeded "$src" "$dst" || die "Unable to copy $src into $dst"
+		else
+			echo " (skip)"
+		fi
+		;;
+	esac
+}
+
+###################################################################
+## remote
+function remote()
+{
+	local cmd=$1
+	case $cmd in
+	begin)
+
+		local dst=$2
+		local full_upgrade=yes
+
+		if [[ "$dst" =~ ^.*://([^:/]+)(:([0-9]+))?(.*)$ ]]; then
+			rm_server=${BASH_REMATCH[1]}
+			rm_port=${BASH_REMATCH[3]}
+			rm_dir=${BASH_REMATCH[4]}
+		else
+			die "Unvalid file specification '$dest'"
+		fi
+
+		rm_tmpdir=${cachedir}/${rm_server}
+		rm_modefile=${rm_tmpdir}/mode
+		rm_newmode="$platform-$cpu-$mso-$mode"
+
+		[ -d "${rm_tmpdir}" ] || mkdir -p "${rm_tmpdir}" || die "unable to create temp dir: ${rm_tmpdir}"
+    
+		if [ -f ${rm_modefile} ]; then
+			local lastmode=$(< ${rm_modefile})
+#			echo last mode:$lastmode, new mode:${rm_newmode}
+			if [ "${rm_newmode}" == "$lastmode" ]; then
+				full_upgrade=no
+			fi
+		fi
+
+		if [ "$full_upgrade" == "yes" ]; then
+			echo "Perform full upgrade"
+			rm -rf ${rm_tmpdir}/*
+		fi
+
+		echo "publish via ${rm_tmpdir}"
+#		echo "update to ${rm_newmode}"
+	    ;;
+
+	end)
+#		echo "update to ${rm_newmode}"
+		echo ${rm_newmode} > ${rm_modefile}
+		;;
+
+	send)
+		local src=$2
+		local dst=$3
+		local temp=${rm_tmpdir}/${src##*/}
+		local src_cksum=$(cksum $src)
+		local imm_cksum=$(cksum $temp)
+		local opts
+
+		mkdir -p ${rm_tmpdir} || die "unable to create dir: ${rm_tmpdir}"
+		rm_path=/${dst#*://*/}
+		rm_dir=${rm_path%/*}
+		rm_file=${rm_path##*/}
+		if [ ! -f "$temp" -o "$src" -nt "$temp" -o "$src_cksum" != "$imm_cksum" ]; then
+			echo " (update)"
+			${cross}objcopy --strip-unneeded $src $temp || die "Unable to strip $src into $temp"
+
+			if ! $publisher upload $temp $dst; then
+				rm $temp
+				die "Unable to send file $temp to $dst"
+			fi
+		else
+			echo " (skip)"
+		fi
+		;;
+	esac
+}
+
+###################################################################
+# curl publishing
+
+function curl()
+{
+	local cmd=$1
+	case $cmd in
+	begin)
+		local dst=$2
+
+		curl_exe=$(which curl)
+		case $dst in
+		sftp://*) curl_opts="--insecure --key ${HOME}/.ssh/id_rsa --pubkey ${HOME}/.ssh/id_rsa.pub";;
+		*)        curl_opts="--insecure --netrc";;
+		esac
+		remote $*
+		;;
+
+	end|send)
+		remote $*
+	    ;;
+
+	upload)
+		local src=$2
+		local dst=$3
+
 		# -u <user:password> vs --netrc
 
 		# curl --insecure --key ~/.ssh/id_rsa --pubkey ~/.ssh/id_rsa.pub --upload-file ./output/c5320-mips-cvc/dev/DALManager scp://oleg.sesov@192.168.23.200/upload/DalManager
 		# curl --ftp-create-dirs --insecure --key ~/.ssh/id_rsa --pubkey ~/.ssh/id_rsa.pub --upload-file ./output/c5320-mips-cvc/dev/DALManager sftp://oleg.sesov@192.168.23.200/~/upload/a/b/c/DalManager
 
-		case $dst in
-		sftp://*) opts="--insecure --key ${HOME}/.ssh/id_rsa --pubkey ${HOME}/.ssh/id_rsa.pub";;
-		*)        opts="--insecure --netrc";;
-		esac
-
-		if ! curl --progress-bar --ftp-create-dirs $opts --upload-file $temp $dst < /dev/null; then
-			rm $temp
-			die "Unable to send file $temp to $dst"
+		if ! $curl_exe --progress-bar --ftp-create-dirs $curl_opts --upload-file $src $dst < /dev/null; then
+			return 1
 		fi
-#		curl --insecure --progress-bar --ftp-create-dirs --netrc --upload-file $temp $dst < /dev/null 2> /dev/null || die "Unable to send file $temp to $dst"
-	else
-		echo " (skip)"
-	fi
+#			curl --insecure --progress-bar --ftp-create-dirs --netrc --upload-file $temp $dst < /dev/null 2> /dev/null || die "Unable to send file $temp to $dst"
+		
+		;;
+	esac
+}
+
+###################################################################
+# sftp publishing
+
+function scp()
+{
+	local cmd=$1
+
+	case $cmd in
+	upload)
+		local src=$2
+		local dst=$3
+
+		$(which scp) -C ${rm_port:+-P ${rm_port}} -i ${HOME}/.ssh/id_rsa $src ${rm_user:+$rm_user@}$rm_server:$rm_path
+		;;
+	*)
+		remote $*
+		;;
+	esac
 }
 
 ######################################################################
-function publish_begin()
-{
-	local dst=$1
-
-	echo " Publish to $dst"
-	case $dst in
-	file://*) file.publish_begin $* ;;
-	svn://*)  svn.publish_begin  $* ;;
-	*://*)    curl.publish_begin $* ;;
-	esac
-}
-
-function publish_end()
-{
-	local dst=$1
-
-	case $dst in
-	file://*) file.publish_end $* ;;
-	svn://*)  svn.publish_end  $* ;;
-	*://*)    curl.publish_end $* ;;
-	esac
-}
-
-function publish_file()
+function send_file()
 {
 	local src=$1
 	local dst=$2
@@ -165,11 +202,7 @@ function publish_file()
 		return 1
 	fi
 
-	case $dst in
-	file://*) file.publish_file $* ;;
-	svn://*)  svn.publich_file  $* ;;
-	*://*)    curl.publish_file $* ;;
-	esac
+	$publisher send $*
 }
 
 
@@ -208,18 +241,28 @@ if [ -z "$dest" ]; then
 	exit 1
 fi
 
-old_ifs=$IFS
-IFS='-'
-read mso platform mode <<< "$target"
-IFS=$old_ifs
+IFS='-' read mso platform mode <<< "$target"
 
 case $target in
 	*-c5320-*|*-samsung-*|*-humax-*|*-humaxwb-*)
+		cross=mipsel-linux-
 		cpu=mips;;
 	*-samsung4k-*|*-humax4k-*)
+		cross=arm-linux-
 		cpu=arm;;
 	*) die "Unknown CPU $target";;
 esac
+
+# toolchain
+case $target in
+	*-c5320-*|*-samsung-*|*-humax-*)
+		toolchain=/opt/toolchains/gcc-4.2.0/bin;;
+	*-humaxwb-*)
+		toolchain=/opt/toolchains/stbgcc-4.5.4-2.8/bin;;
+	*) die "Unknown toolchain $target";;
+esac
+
+${toolchain:+eval PATH=$toolchain:$PATH}
 
 # normalize destination url
 case $dest in
@@ -246,16 +289,30 @@ dist_files  libnetsnmpagent.so libnetsnmphelpers.so libnetsnmpmibs.so libnetsnmp
 dist_files  libyaml.so libz.so libjpeg.so libfreetype.so libcurl.so
 dist_files  libbreakpad_client.so libpng.so
 
-publish_begin $dest
+# Check publisher
+
+if [ -z "$puhlisher" ]; then
+	case $dest in
+	file://*) publisher=file;;
+	svn://*)  publisher=svn ;;
+	sftp://*) publisher=curl ;;
+	scp://*)  publisher=scp ;;
+	*://*)    publisher=curl ;;
+	esac
+fi
+
+[ -n "$publisher" ] || die "Unknown publisher"
+
+$publisher begin $dest
 
 for i in $files; do
     case $i in
-    *:*) publish_file $src/${i%:*} $dest/${i##*:};;
-    *)   publish_file $src/$i $dest/$i;;
+    *:*) send_file $src/${i%:*} $dest/${i##*:};;
+    *)   send_file $src/$i $dest/$i;;
     esac
 done
 
-publish_end $dest
+$publisher end $dest
 
 for g in ${group_cfg[@]}; do
 	
