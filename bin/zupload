@@ -288,6 +288,7 @@ dist_files  libcarousels.so libipc.so
 dist_files  libnetsnmpagent.so libnetsnmphelpers.so libnetsnmpmibs.so libnetsnmp.so
 dist_files  libyaml.so libz.so libjpeg.so libfreetype.so libcurl.so
 dist_files  libbreakpad_client.so libpng.so
+dist_files  libmemdebug.so
 
 # Check publisher
 

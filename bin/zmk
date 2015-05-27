@@ -120,13 +120,19 @@ function mksymbols-stripped()
 function stackwalk()
 {
 	local name
-	mksymbols-stripped
+	mksymbols
+#	mksymbols-stripped
 #	ls -l ../symbols/${platform}-${cpu}-${mso}/${mode}
+
+	if [ ! -f "$1" ]; then
+		return
+	fi
+
 	case $1 in
 	*.gz) gunzip $1; name=${1%%.gz};;
-	*) name=$1;
+	*)    name=$1;
 	esac
-    
+
 #	minidump_stackwalk $name ../symbols/${platform}-${cpu}-${mso}/${mode} 2> $name.info | grep -v "[a-z][a-z0-9] = \|Found by:" | mipsel-linux-c++filt > $name.text
 	minidump_stackwalk $name ../symbols/${platform}-${cpu}-${mso}/${mode} 2> $name.info > $name.text
 }
@@ -380,10 +386,12 @@ function make-sh()
 		build-solution $curdir $2 || exit 1
 #		bash ./make.sh $2 || exit 1
 		if [ "$scope" == "world" ]; then
-			if [ "$mode" == "dbg" ]; then
-			    mksymbols
+			if [ "$mode" == "dbg" -o "$ENABLE_DEBUG_SYMBOLS" = "1" ]; then
+				echo "Use debug symbols"
+				mksymbols
 			else
-			    mksymbols-stripped
+				echo "use stripped symbols"
+				mksymbols-stripped
 		    fi
 		fi
 		;;
