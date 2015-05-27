@@ -115,7 +115,8 @@ function remote()
 		rm_path=/${dst#*://*/}
 		rm_dir=${rm_path%/*}
 		rm_file=${rm_path##*/}
-		if [ ! -f "$temp" -o "$src" -nt "$temp" -o "$src_cksum" != "$imm_cksum" ]; then
+
+		if [ "$src_cksum" != "$imm_cksum" ]; then
 			echo " (update)"
 			${cross}objcopy --strip-unneeded $src $temp || die "Unable to strip $src into $temp"
 
