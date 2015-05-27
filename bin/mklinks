@@ -1,0 +1,53 @@
+#!/bin/sh
+
+function die()
+{
+	echo "$*"
+	exit 1
+}
+
+function link()
+{
+	dest=$1; shift
+	back=$1; shift
+
+	mkdir -p $dest
+
+	for name in $*; do
+		pushd $dest > /dev/null
+		if [[ -f $back/$srcdir/$name ]]; then
+			ln -sf $back/$srcdir/$name $name
+			echo link $name
+		else
+			echo skip $name
+		fi
+		popd > /dev/null
+	done
+}
+
+
+function add()
+{
+	target=$1;
+	shift
+	eval "$target+=\"$*\""
+}
+
+while (( $# )); do
+	case $1 in
+	--srcdir)
+		srcdir=${2:-.}
+		shift
+		;;
+	esac
+	shift
+done
+
+[ -n "$srcdir" ] || srcdir=../dist/build # die "No src dir specified"
+
+add bin supervisor             DALManager       ncas_host_app  powerup-launcher  swtv            dpi_host_app
+add lib libb_dcc_zodiac.so     libcarousels.so  libdc.so       libdts.so         libekg.so       libipc.so  libjpeg.so          libnetsnmphelpers.so  libnetsnmp.so  libpng.so          libpowerup.so  libsdv.so   libtoopl.so  libz.so
+add lib libbreakpad_client.so  libcurl.so       libde.so       libdvbs.so        libfreetype.so  libipg.so  libnetsnmpagent.so  libnetsnmpmibs.so     libns.so       libpowerup-api.so  libprofile.so  libskia.so  libyaml.so   libzvod.so
+
+link usr/bin ../.. $bin
+link usr/lib ../.. $lib
