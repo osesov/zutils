@@ -1,9 +1,75 @@
-#!/bin/sh
+#!/bin/bash
+
+# ANSI
+# black="\033[0;30m"
+# red="\033[0;31m"
+# green="\033[0;32m"
+# yellow="\033[1;33m"
+# blue="\033[0;34m"
+# purple="\033[0;35m"
+# cyan="\033[0;36m"
+# lightgray="\033[0;37m"
+
+# darkgray="\033[1;30m"
+# lightred="\033[1;31m"
+# lightgreen="\033[1;32m"
+# lightyellow="\033[1;33m"
+# lightblue="\033[1;34m"
+# lightpurple="\033[1;35m"
+# lightcyan="\033[1;36m"
+# white="\033[1;37m"
+#
+# nocolor="\033[0m"
+
+# terminfo
+if [ -t 1 ]; then
+
+    # see if it supports colors...
+    ncolors=$(tput colors)
+
+    if test -n "$ncolors" && test $ncolors -ge 8; then
+        bold="$(tput bold)"
+        underline="$(tput smul)"
+        standout="$(tput smso)"
+        normal="$(tput sgr0)"
+        black="$(tput setaf 0)"
+        red="$(tput setaf 1)"
+        green="$(tput setaf 2)"
+        yellow="$(tput setaf 3)"
+        blue="$(tput setaf 4)"
+        magenta="$(tput setaf 5)"
+        cyan="$(tput setaf 6)"
+        lightgray="$(tput setaf 7)"
+    fi
+fi
+
+darkgray="${bold}${black}"
+lightred="${bold}${red}"
+lightgreen="${bold}${green}"
+lightyellow="${bold}${yellow}"
+lightblue="${bold}${blue}"
+lightmagenta="${bold}${magenta}"
+lightcyan="${bold}${cyan}"
+white="${bold}${lightgray}"
+
+nocolor="${normal}"
 
 function die()
 {
 	echo "$*"
 	exit 1
+}
+
+
+function silent()
+{
+    $* > /dev/null || die "$*: failed"
+}
+
+function color()
+{
+    local color=$1; shift
+    echo "${!color}$*${nocolor}"
 }
 
 function link()
@@ -13,16 +79,18 @@ function link()
 
 	mkdir -p $dest
 
+	if ! silent pushd $dest; then
+		return 1
+	fi
 	for name in $*; do
-		pushd $dest > /dev/null
 		if [[ -f $back/$srcdir/$name ]]; then
 			ln -sf $back/$srcdir/$name $name
-			echo link $name
+			echo -e "${green}link $name${nocolor}"
 		else
-			echo skip $name
+			echo -e "${yellow}skip $name${nocolor}"
 		fi
-		popd > /dev/null
 	done
+	silent popd
 }
 
 
@@ -30,7 +98,7 @@ function add()
 {
 	target=$1;
 	shift
-	eval "$target+=\"$*\""
+	eval "$target+=\" $*\""
 }
 
 while (( $# )); do
@@ -39,11 +107,14 @@ while (( $# )); do
 		srcdir=${2:-.}
 		shift
 		;;
+	*)
+		break;;
 	esac
 	shift
 done
 
-[ -n "$srcdir" ] || srcdir=../dist/build # die "No src dir specified"
+[ -n "$srcdir" ] || srcdir=$1
+[ -n "$srcdir" ] || die "No src dir specified"
 
 add bin supervisor             DALManager       ncas_host_app  powerup-launcher  swtv            dpi_host_app
 add lib libb_dcc_zodiac.so     libcarousels.so  libdc.so       libdts.so         libekg.so       libipc.so  libjpeg.so          libnetsnmphelpers.so  libnetsnmp.so  libpng.so          libpowerup.so  libsdv.so   libtoopl.so  libz.so
