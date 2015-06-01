@@ -19,7 +19,7 @@ source $config
 
 if [ "$mode" = "tn" ]; then
     case $1 in
-    cmd2k|snmpget|snmpwalk|set|getfile|com)
+    cmd2k|snmpget|snmpwalk|set|getfile|com|list|status)
 	mode=$1
 	shift
 	;;
@@ -27,7 +27,7 @@ if [ "$mode" = "tn" ]; then
 fi
 
 case $mode in
-    set|tn) ;;
+    set|tn|list|status) ;;
 
     cmd2k|snmpget|snmpwalk|getfile)
 	addrtype=ip;;
@@ -58,6 +58,24 @@ done
 if [ -z "$addrtype" ]; then
 	addrtype=ip
 fi
+
+case $mode in
+    list)
+
+	cat $boxlist | while IFS=':' read -ra BOX; do
+		name=${BOX[0]}
+		case $name in
+		\#*)
+			;;
+
+		*)
+			printf "%s:\tip=%s\trf=%s\tcom=%s\n" "${BOX[0]}" "${BOX[1]}" "${BOX[2]:-<none>}" "${BOX[3]:-<none>}"
+		;;
+		esac
+	done
+	exit 0
+    ;;
+esac
 
 #read box info
 if [ -z "$box" ]; then
@@ -140,6 +158,10 @@ case "$mode" in
         file=$1
 	out=${2:-${file##*/}}
         $(dirname $0)/zgetfile "$addr" telnet root wb@humax "$file" "$out"
+	;;
+
+    status)
+	printf "%s: %s %s\n" "$box" "$addrtype" "$addr"
 	;;
 esac
 
