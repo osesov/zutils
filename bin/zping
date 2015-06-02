@@ -1,0 +1,56 @@
+#!/usr/bin/expect -f
+
+set port telnet
+set wait 1000
+
+set myargs $argv
+while {[llength $myargs]} {
+    set myargs [lassign $myargs arg]
+    if {[string equal -length 2 "--" "$arg"]} {
+		# Option
+		switch -exact -- [string range $arg 2 end] {
+			verbose {set ::verbose 1}
+			wait    {set myargs [lassign $myargs ::wait]}
+			help    {
+				puts "zping \[-wait <msec>] <host>\[:<port>]"
+				exit 0
+			}
+		}
+	} else {
+		set server $arg
+	}
+}
+
+# default exit status is error
+set status 1
+
+if [regexp {(.*):(.*)} $server matched host port] {
+
+} else {
+	set host $server
+	set port telnet
+}
+
+while {$status == 1} {
+    # open non-blocking socket
+    puts "connect to $host via $port..."
+    set s [socket -async $host $port]
+    fconfigure $s -blocking 0
+
+    # when connected update status
+    fileevent $s writable [list set status 0]
+
+    # wait some time otherwise
+    after $wait set status 1
+    vwait status
+
+    catch {close $s}
+
+    if {$status == 0} {
+        puts success
+    } else {
+        puts "timed out"
+    }
+}
+
+exit $status
