@@ -2,6 +2,7 @@
 
 set port telnet
 set wait 1000
+set time 5000
 
 set myargs $argv
 while {[llength $myargs]} {
@@ -10,6 +11,7 @@ while {[llength $myargs]} {
 		# Option
 		switch -exact -- [string range $arg 2 end] {
 			verbose {set ::verbose 1}
+			time    {set myargs [lassign $myargs ::time]}
 			wait    {set myargs [lassign $myargs ::wait]}
 			help    {
 				puts "zping \[-wait <msec>] <host>\[:<port>]"
@@ -31,9 +33,32 @@ if [regexp {(.*):(.*)} $server matched host port] {
 	set port telnet
 }
 
+
+# progress mark
+set phases {- / | \\}
+proc ascii_animate _var {
+    upvar 1 $_var var
+    if {[llength $var] != 0 } {
+	    puts -nonewline \b[lindex $var 0]
+	    flush stdout
+	    set var [concat [lrange $var 1 end] [lindex $var 0]]
+	    after 500 [list ascii_animate $_var ]
+    }
+}
+
+proc stop_animate {_var msg} {
+    upvar 1 $_var var
+    set var [list]
+    puts "\b \b$msg"
+}
+
+puts -nonewline "connect to $host via $port...  "
+ascii_animate phases
+
+after $time { stop_animate phases "failed to connect"; exit 1 }
+
 while {$status == 1} {
     # open non-blocking socket
-    puts "connect to $host via $port..."
     set s [socket -async $host $port]
     fconfigure $s -blocking 0
 
@@ -44,12 +69,11 @@ while {$status == 1} {
     after $wait set status 1
     vwait status
 
-    catch {close $s}
+#    catch {close $s}
 
+    close $s
     if {$status == 0} {
-        puts success
-    } else {
-        puts "timed out"
+	stop_animate phases "ok"
     }
 }
 
