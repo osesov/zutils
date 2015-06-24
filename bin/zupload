@@ -209,17 +209,49 @@ function send_file()
 
 function dist_files()
 {
-    files="$files $@"
+	for i in $@; do
+		files+=("$i")
+	done
 }
 
 #pwd
 
-target=$1
-source=${2:-..}
+while (( $# )); do
+	case $1 in
+	--source) shift; source=$1  ;;
+	--target) shift; target=$1  ;;
+	--dest)   shift; dest=$1    ;;
+	--)       shift;
+
+		while (( $# )); do
+			dist_files "$1"
+			shift
+		done
+		break
+		;;
+
+	-*)
+		die "Unknown option $1";;
+	*)
+		break;;
+	esac
+	shift
+done
+
+if [ -z "$target" ]; then
+	target=$1
+	shift;
+fi
+
+if [ -z "$source" ]; then
+	source=${1:-..}
+	shift
+fi
 
 if [ -z "$target" ]; then
 	die "Target is not set"
 fi
+
 
 case $dest in
 	*://*)
@@ -277,19 +309,28 @@ src=$source/output/$platform-$cpu-$mso/$mode
 
 echo "publish ($src) to $dest"
 
-dist_files  DALManager
-dist_files  libpowerup.so libtoopl.so libsdv.so libprofile.so libipg.so libekg.so
-dist_files  libdc.so libns.so libdts.so libzvod.so
-dist_files  libpowerup-api.so
-dist_files  libdvbs.so
-dist_files  libskia.so
-dist_files  ncas_host_app supervisor dpi_host_app
-dist_files  powerup-launcher
-dist_files  libcarousels.so libipc.so
-dist_files  libnetsnmpagent.so libnetsnmphelpers.so libnetsnmpmibs.so libnetsnmp.so
-dist_files  libyaml.so libz.so libjpeg.so libfreetype.so libcurl.so
-dist_files  libbreakpad_client.so libpng.so
-dist_files  libmemdebug.so
+if (( $# )); then
+	for i in "$@"; do
+		dist_files "$i"
+	done
+fi
+
+# load defaults
+if (( ${#files[@]} == 0 )); then
+	dist_files  DALManager
+	dist_files  libpowerup.so libtoopl.so libsdv.so libprofile.so libipg.so libekg.so
+	dist_files  libdc.so libns.so libdts.so libzvod.so
+	dist_files  libpowerup-api.so
+	dist_files  libdvbs.so
+	dist_files  libskia.so
+	dist_files  ncas_host_app supervisor dpi_host_app
+	dist_files  powerup-launcher
+	dist_files  libcarousels.so libipc.so
+	dist_files  libnetsnmpagent.so libnetsnmphelpers.so libnetsnmpmibs.so libnetsnmp.so
+	dist_files  libyaml.so libz.so libjpeg.so libfreetype.so libcurl.so
+	dist_files  libbreakpad_client.so libpng.so
+	dist_files  libmemdebug.so
+fi
 
 # Check publisher
 
@@ -305,6 +346,7 @@ fi
 
 [ -n "$publisher" ] || die "Unknown publisher"
 
+echo "Publish $target from '$source' to '$dest'"
 $publisher begin $dest
 
 for i in $files; do
