@@ -430,6 +430,10 @@ while test $# -ne 0; do
     shift
 
     case "$i" in
+	--dirtrace)
+		export ENABLE_DIRTRACE=1
+		;;
+
 	--clean|--build|--rebuild|--resend)
 		action=${i:2}
 		;;
