@@ -62,6 +62,8 @@ function use-target()
 			cpu=mips;;
 		*-samsung4k-*|*-humax4k-*)
 			cpu=arm;;
+		*-posix-*)
+			cpu=posix;;
 		*) die "Unknown CPU $target";;
 	esac
 }
