@@ -1,9 +1,5 @@
 #! /usr/bin/gawk -f
 
-#
-# PowerUp performance using logs
-# 
-
 func die(msg, a, b, c, d, e, f)
 {
     printf( msg, a, b, c, d, e, f )
@@ -89,157 +85,187 @@ function gettime(date, time)
 function print_arr(arr, \
 		   _col, _index)
 {
-    
-    _col = 0
-    for (_index in title) {
-	if (title[_index] == "")
-	    continue;
 
-	if (_col != 0)
-	    printf(",")
-	printf("%s", arr[_index])
-	_col++;
-    }
-
-    printf("\n");
-
+	for (_index = 0; _index < length(p); ++_index) {
+#	for (_index in p) {
+		if (_index != 0)
+			printf(",")
+		printf("%s", arr[p[_index]])
+		_col++;
+	}
+	printf("\n");
 }
 
 function print_header()
 {
-    print_arr( title );
+	print_arr( title );
 
-    delete avg
-    averages = 0;
+	delete avg
+	averages = 0;
 }
 
 function print_stats()
 {
-    if (!boot_start)
-	return
+	if (!start[boot])
+		return
 
-    print_arr( time );
+	printf("%d)", boot_index )
+	print_arr( time );
 
 # update average
-    for (i in title) {
-	avg[i] = avg[i] + time[i];
-    }
-    averages++;
+	for (i in title) {
+		avg[i] = avg[i] + time[i];
+	}
+	averages++;
 
 #    printf("%s\t%s\t%s\n", dal_time, powerup_time, ready_to_watch_time)
-    boot_start = 0;
-    
+#    start[boot] = 0;
 }
 
 function print_final()
 {
-    print_stats();
+	print_stats();
 
-    print "---";
-    if (averages) {
-	for (i in title) {
-	    avg[i] = int(avg[i] / averages);
+	print "---";
+	if (averages) {
+		for (i in title) {
+			avg[i] = int(avg[i] / averages);
+		}
 	}
-    }
 
-    print_arr( avg )
+	print_arr( avg )
 
-    delete avg
-    averages = 0;
+	delete avg
+	averages = 0;
+}
+
+function begin_boot()
+{
+	if (state != none) {
+		state=none
+		delete start
+		boot_index++;
+		fixtime = 0;
+
+		delete start
+		delete time
+		close( out );
+		out = FILENAME ".part" boot_index ".log";
+		printf("") > out;
+#		print "BOOT: " boot_index ")", $0
+	}
 }
 
 BEGINFILE {
-    boot_start = 0;
-    fixtime = 0;
-    boot_index = 0;
 
 # indices
-    boot = 0
-    dal  = 1
-    powerup = 2
-    ready_to_watch = 3
+	first = -1
+	none = 0
+	boot = 1
+	dal  = 2
+	powerup = 3
+	ready_to_watch = 4
+
+	platform=100
 
 # titles
-    title[ boot ] = ""
-    title[ dal  ] = "dal"
-    title[ powerup ] = "powerup"
-    title[ ready_to_watch ] = "ready_to_watch"
+	title[ boot ] = ""
+	title[ dal  ] = "dal"
+	title[ powerup ] = "powerup"
+	title[ ready_to_watch ] = "ready_to_watch"
+	title[ platform ] = "Platform"
 
-    print "*** " FILENAME;
-    print_header();
+# print
+	p[0] = dal
+	p[1] = powerup
+	p[2] = platform
+	p[3] = ready_to_watch
+
+# env
+	state = first
+	fixtime = 0;
+	boot_index = 0;
+	start[boot] = 0;
+
+	print "*** " FILENAME;
+	print_header();
 }
 
 
 # line time is in $2 and $3
 # [DBG] 13.08.2015 06:04:16.501
-
-/Thread::init\('LogBufferThread'\)/ { # first supervisor message
-
-    fixtime = 0;
-
-    delete start
-    delete time
-
-    start[ boot ] = boot_start = gettime($2, $3)
-    boot_index++;
-
-    close( out );
-    out = FILENAME ".boot" boot_index ".log";
-
-#    print "start: " boot_start, ts2str(boot_start);
+/BCM74130011|main: starting supervisor/ {  # first supervisor message, reset stage
+	begin_boot();
 }
 
+!start[ boot ] && /\[SUPERVISOR\]/ {
+    begin_boot();
+    start[ boot ] = gettime($2, $3)
+    state = boot
+#    print "SUPERVISOR: ", $0
+#    print "start: " start[boot], ts2str(start[boot]), $0;
+}
+
+#!start[dal] && /\[DalManager\]/ {
 /DAL: main: DAL version/ { # first DAL message
-    if (!boot_start) {
+    if (!start[boot]) {
 	print "no start message found"
 	next;
     }
 
     start[dal] = gettime($2, $3) - fixtime
     time[dal]  = start[dal] - start[boot]
+    state = dal
 }
 
 /DAL: PosixProcess::run: run \[powerup-launcher\]/ {
-    if (!boot_start) {
+    if (!start[boot]) {
 	print "no start message found"
 	next;
     }
 
     start[powerup] = gettime($2, $3) - fixtime
     time[powerup] = start[powerup] - start[dal]
+    state = powerup
 }
 
 /Registry: set: \[registry\] ready_to_watch <-- 1 \[added, 0\]/ {
-    if (!boot_start) {
+    if (!start[boot]) {
 	print "no start message found"
 	next;
     }
 
     start[ready_to_watch] = gettime($2, $3) - fixtime
     time[ready_to_watch] = start[ready_to_watch] - start[powerup]
+    state = ready_to_watch
 
     print_stats();
 }
 
-/system time changed from .* to .*/ { # time fix message
-    if (!boot_start)
-	next
+/LifeCycleManager: initialization of the component DOB2 complete/ {
+    now = gettime($2, $3) - fixtime
+    time[ platform ] = now - start[ powerup ]
+}
 
-    if (!match($0, /system time changed from (.*) to (.*)/, arr))
-	die("Unable to match time");
-	
-    delta1 = gettime(arr[1])
-    delta2 = gettime(arr[2])
-    fixtime += (delta2 - delta1)
+/system time changed from .* to .*/ { # time fix message
+	if (!start[boot])
+		next
+
+	if (!match($0, /system time changed from (.*) to (.*)/, arr))
+		die("Unable to match time");
+
+	delta1 = gettime(arr[1])
+	delta2 = gettime(arr[2])
+	fixtime += (delta2 - delta1)
 }
 
 ENDFILE {
-    print_final()
-    close( out );
+	print_final()
+	close( out );
 }
 
 {
-    if (boot_start) {
-	print $0 >> out;
-    }
+	if (start[boot]) {
+		print $0 >> out;
+	}
 }
