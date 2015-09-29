@@ -19,7 +19,7 @@ function time2ts( year, mon, day, hour, min, sec, msec )
 	  int( ( 367 * ( mon - 2 - 12 * int( ( mon - 14 ) / 12) ) ) / 12) - \
 	  int( ( 3 * ( ( year + 4900 +  int( ( mon - 14 ) / 12) ) / 100 ) ) / 4) + \
 	  day - 32075 )							\
-	* (24 * 60 * 60 * 1000) + (((hour * 60 + min) * 60 + sec) * 1000 + msec)
+	* (24 * 60 * 60 * 1000) + (((hour * 60 + min) * 60 + sec) * 1000 + msec);
 }
 
 function ts2time( jd, r,			\
@@ -264,8 +264,18 @@ ENDFILE {
 	close( out );
 }
 
+/^$/ { next; }
+
 {
+
 	if (start[boot]) {
-		print $0 >> out;
+		if (/^\[...\] [[:digit:]]{2}\.[[:digit:]]{2}\.[[:digit:]]{4}\ [[:digit:]]{2}\:[[:digit:]]{2}\:[[:digit:]]{2}\.[[:digit:]]{3}\ /) {
+			now = gettime($2, $3) - fixtime
+			t = now - start[ state ]
+			printf("%8u %s\n", t, $0) >> out;
+		}
+		else {
+			printf("%8s %s\n", "", $0) >> out;
+		}
 	}
 }

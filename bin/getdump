@@ -1,0 +1,22 @@
+#!/bin/bash
+
+function getdump()
+{
+    local url=$1
+    n=${url##*=}
+    wget -O $n.txt $url
+}
+
+for i in "$@"; do
+	case $i in
+	*://*)
+		getdump $i
+		;;
+
+	*)
+		cat $i | while read u; do
+			getdump $u
+		done
+		;;
+	esac
+done
