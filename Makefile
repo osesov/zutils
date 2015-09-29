@@ -1,4 +1,4 @@
-BIN_FILES=dumpview  mips-configure svn-list-commits svn-merge-list svn-merge-message svn-merge-revs tn update-group-cfg zgetfile zmk ztelnet zupload mklinks zping getdump
+BIN_FILES=dumpview  mips-configure svn-list-commits svn-merge-list svn-merge-message svn-merge-revs tn update-group-cfg zgetfile zmk ztelnet zupload mklinks zping getdump perflog
 X32_FILES=$(addprefix x32/, dump_syms minidump_dump minidump_stackwalk core2md minidump-2-core)
 X64_FILES=$(addprefix x64/, dump_syms minidump_dump minidump_stackwalk core2md minidump-2-core)
 
