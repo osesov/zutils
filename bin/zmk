@@ -97,7 +97,7 @@ function gensymbols-stripped()
 		if [[ $i =~ .*.dbg ]]; then
 			continue
 		fi
-		if [[ $type =~ executable|shared\ object ]]; then
+		if [[ "$type" =~ executable|shared\ object ]]; then
 			if [ "$i" -nt "$sym" ]; then
 				echo "Generate symbols $i => $sym"
 #				mipsel-linux-strip -s $i
