@@ -30,8 +30,6 @@ typedef uint32_t RVA;
 # define O_BINARY 0
 #endif
 
-
-
 #define I32 ""
 #define L32 "l"
 #define L64 "ll"

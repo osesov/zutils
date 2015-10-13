@@ -1,6 +1,9 @@
 ;; link this to ~/.emacs.d/init.el
 
-(add-to-list 'load-path "~/zutils/emacs")
+(let ((q (directory-file-name (file-name-directory (file-truename user-init-file)))))
+  (if q
+	  (add-to-list 'load-path q)))
+
 (require 'psvn)
 
 (setq user-mail-address "oleg.sesov@dev.zodiac.tv")
@@ -32,3 +35,8 @@
 (setenv "ENABLE_DIRTRACE" "1")
 (setenv "DISABLE_COLORS" "1")
 (setq compile-command "zmk")
+
+
+;(loop for x being the symbols
+;    if (boundp x)
+;    do (print (cons (symbol-name x) (symbol-value x))))

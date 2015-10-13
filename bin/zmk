@@ -432,8 +432,9 @@ while test $# -ne 0; do
     shift
 
     case "$i" in
-	--dirtrace)
+	--dirtrace|--dir-trace)
 		export ENABLE_DIRTRACE=1
+		export DISABLE_COLORS=1
 		;;
 
 	--clean|--build|--rebuild|--resend)
