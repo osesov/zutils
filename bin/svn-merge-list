@@ -31,9 +31,8 @@ for rev in $(svn mergeinfo --show-revs eligible $branch .); do
 	unset tasks
 	while read line; do
 
-		if [[ "$line" =~ ^\#([^:]+):.*:Information\ for\ QA\ -\ \"(.*)\"$ ]]; then
+		if [[ "$line" =~ ^\#([^:]+): ]]; then
 			t=${BASH_REMATCH[1]}
-			qi=${BASH_REMATCH[2]}
 			if [ -n "$tasks" ]; then
 				tasks+=" "
 			fi
@@ -47,7 +46,7 @@ for rev in $(svn mergeinfo --show-revs eligible $branch .); do
 	if [ -z "$tasks" ]; then
 		continue
 #		flush
-#		echo "$rev"
+		echo "$rev -- ????"
 	elif [ "$tasks" != "$lc" ]; then
 		flush
 		revlist="$rev"

@@ -150,9 +150,16 @@ function begin_boot()
 		delete start
 		delete time
 		close( out );
-		out = FILENAME ".part" boot_index ".log";
+		out = sprintf("%s.part.%02d.log", FILENAME, boot_index );
 		printf("") > out;
 #		print "BOOT: " boot_index ")", $0
+	}
+}
+
+function print_state(s)
+{
+	if (start[boot]) {
+		printf("<<<%s>>>\n", s) >> out;
 	}
 }
 
@@ -194,14 +201,22 @@ BEGINFILE {
 
 # line time is in $2 and $3
 # [DBG] 13.08.2015 06:04:16.501
-/BCM74130011|main: starting supervisor/ {  # first supervisor message, reset stage
+/BCM74130011/ {  # first box message, reset stage
 	begin_boot();
+}
+
+/main: starting supervisor/ {  # first supervisor message, reset stage
+    begin_boot();
+    start[ boot ] = gettime($2, $3)
+    state = boot
+    print_state( "boot" );
 }
 
 !start[ boot ] && /\[SUPERVISOR\]/ {
     begin_boot();
     start[ boot ] = gettime($2, $3)
     state = boot
+    print_state( "boot" );
 #    print "SUPERVISOR: ", $0
 #    print "start: " start[boot], ts2str(start[boot]), $0;
 }
@@ -216,6 +231,7 @@ BEGINFILE {
     start[dal] = gettime($2, $3) - fixtime
     time[dal]  = start[dal] - start[boot]
     state = dal
+    print_state( "dal" );
 }
 
 /DAL: PosixProcess::run: run \[powerup-launcher\]/ {
@@ -227,6 +243,7 @@ BEGINFILE {
     start[powerup] = gettime($2, $3) - fixtime
     time[powerup] = start[powerup] - start[dal]
     state = powerup
+    print_state( "powerup" );
 }
 
 /Registry: set: \[registry\] ready_to_watch <-- 1 \[added, 0\]/ {
@@ -238,7 +255,7 @@ BEGINFILE {
     start[ready_to_watch] = gettime($2, $3) - fixtime
     time[ready_to_watch] = start[ready_to_watch] - start[powerup]
     state = ready_to_watch
-
+    print_state("ready_to_watch");
     print_stats();
 }
 
