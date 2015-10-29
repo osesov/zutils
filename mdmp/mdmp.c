@@ -24,15 +24,21 @@ typedef uint32_t RVA;
 
 #ifdef unix
 # include <unistd.h>
+# include <inttypes.h>
 #endif
 
 #ifndef O_BINARY
 # define O_BINARY 0
 #endif
 
-#define I32 ""
-#define L32 "l"
-#define L64 "ll"
+//#define I32 ""
+#define L32x PRIx32
+#define L32d PRId32
+#define L32u PRIu32
+
+#define L64d PRId64
+#define L64u PRIu64
+#define L64x PRIx64
 
 typedef struct _MINIDUMP_HEADER {
   ULONG32 Signature;
@@ -66,6 +72,21 @@ typedef struct _MINIDUMP_MEMORY_LIST {
   ULONG32                    NumberOfMemoryRanges;
 //  MINIDUMP_MEMORY_DESCRIPTOR MemoryRanges[1];
 } MINIDUMP_MEMORY_LIST;
+
+typedef struct _MINIDUMP_THREAD {
+  ULONG32                      ThreadId;
+  ULONG32                      SuspendCount;
+  ULONG32                      PriorityClass;
+  ULONG32                      Priority;
+  ULONG64                      Teb;
+  MINIDUMP_MEMORY_DESCRIPTOR   Stack;
+  MINIDUMP_LOCATION_DESCRIPTOR ThreadContext;
+} MINIDUMP_THREAD;
+
+typedef struct _MINIDUMP_THREAD_LIST {
+  ULONG32         NumberOfThreads;
+//  MINIDUMP_THREAD Threads[0];
+} MINIDUMP_THREAD_LIST;
 
 typedef enum _MINIDUMP_STREAM_TYPE { 
   UnusedStream               = 0,
@@ -206,13 +227,55 @@ void dump_memory_list_stream( int fd, RVA off, ULONG32 size, FILE * out, int lev
 	off += header_size;
 	
 	indent(out, level);
-	fprintf(out, "Streams: %" L32 "d\n", header.NumberOfMemoryRanges );
+	fprintf(out, "Streams: %" L32d "\n", header.NumberOfMemoryRanges );
 	for (n = 0; n < header.NumberOfMemoryRanges; ++n) {
 		lseek( fd, off + n * item_size, SEEK_SET );
 		read( fd, &item, item_size );
 		indent(out, level);
-		fprintf(out, "MemoryStream #%" L32 "d, @%" L64 "x, size %" L32 "d\n", n + 1, item.StartOfMemoryRange, item.Memory.DataSize );
+		fprintf(out, "MemoryStream #%" L32d ", @%" L64x ", size %" L32d "\n",
+				n + 1, item.StartOfMemoryRange, item.Memory.DataSize );
 		dump_binary( fd, item.Memory.Rva, item.Memory.DataSize, out, level + 1 );
+	}
+}
+
+void dump_thread_list( int fd, RVA off, ULONG32 size, FILE * out, int level )
+{
+	MINIDUMP_THREAD_LIST       header;
+	MINIDUMP_THREAD            item;
+	static const size_t  header_size = sizeof(MINIDUMP_THREAD_LIST);
+	static const size_t  item_size   = sizeof(MINIDUMP_THREAD);
+	ULONG32              n;
+
+	lseek( fd, off, SEEK_SET );
+	read( fd, &header, header_size );
+	off += header_size;
+
+	indent(out, level);
+	fprintf(out, "Threads: %" L32d "\n", header.NumberOfThreads );
+	for (n = 0; n < header.NumberOfThreads; ++n) {
+		lseek( fd, off + n * item_size, SEEK_SET );
+		read( fd, &item, item_size );
+		indent(out, level);
+		fprintf(out, "Thread #%" L32d
+				" ThreadId: %" L32d
+				" SuspendCount: %" L32d
+				" PriorityClass:%" L32d
+				" Priority:%" L32d
+				" Teb:%" L64x
+				" Stack.StartOfMemoryRange:%" L64x
+				"\n",
+				n + 1,
+				item.ThreadId, item.SuspendCount, item.PriorityClass,
+				item.Priority, item.Teb,
+				item.Stack.StartOfMemoryRange);
+
+		indent(out, level + 1);
+		fprintf( out, "ThreadContext\n" );
+		dump_binary( fd, item.ThreadContext.Rva, item.ThreadContext.DataSize, out, level + 2 );
+
+		indent(out, level + 1);
+		fprintf( out, "Stack\n" );
+		dump_binary( fd, item.Stack.Memory.Rva, item.Stack.Memory.DataSize, out, level + 2 );
 	}
 }
 
@@ -226,13 +289,17 @@ void dump_dir( int fd, RVA off, ULONG32 n, FILE * out, int level )
 		read( fd, &dir, sizeof(dir));
 		
 		indent( out, level );
-		fprintf(out,"Stream %" L32 "d\n", j + 1);
-		fprintf(out,"  StreamType: %s(%" L32 "d, 0x%" L32 "x)\n", stream_name(dir.StreamType), dir.StreamType, dir.StreamType );
-		fprintf(out,"  Location  : %" L32 "d , size %" L32 "d\n", dir.Location.Rva, dir.Location.DataSize );
+		fprintf(out,"Stream %" L32d "\n", j + 1);
+		fprintf(out,"  StreamType: %s(%" L32d ", 0x%" L32x ")\n", stream_name(dir.StreamType), dir.StreamType, dir.StreamType );
+		fprintf(out,"  Location  : %" L32d " , size %" L32d "\n", dir.Location.Rva, dir.Location.DataSize );
 		
 		switch ( dir.StreamType ) {
 		case MemoryListStream:
 			dump_memory_list_stream(fd, dir.Location.Rva, dir.Location.DataSize, out, level + 1);
+			break;
+
+		case ThreadListStream:
+			dump_thread_list(fd, dir.Location.Rva, dir.Location.DataSize, out, level + 1);
 			break;
 			
 		case 0x47670003:
@@ -255,13 +322,13 @@ void dump_file(int fd, FILE * out)
 	MINIDUMP_HEADER header;
 	
 	read( fd, &header, sizeof(header) );
-	fprintf(out,"Signature         : %08" L32 "x\n", header.Signature);
-	fprintf(out,"Version           : %08" L32 "x\n", header.Version);
-	fprintf(out,"NumberOfStreams   : %"   L32 "u\n", header.NumberOfStreams);
-	fprintf(out,"StreamDirectoryRva: %"   L32 "u\n", header.StreamDirectoryRva);
-	fprintf(out,"CheckSum          : %08" L32 "x\n", header.CheckSum);
-	fprintf(out,"TimeDateStamp     : %"   L32 "u\n", header.TimeDateStamp);
-	fprintf(out,"Flags             : %08" L64 "x\n", header.Flags);
+	fprintf(out,"Signature         : %08" L32x "\n", header.Signature);
+	fprintf(out,"Version           : %08" L32x "\n", header.Version);
+	fprintf(out,"NumberOfStreams   : %"   L32u "\n", header.NumberOfStreams);
+	fprintf(out,"StreamDirectoryRva: %"   L32u "\n", header.StreamDirectoryRva);
+	fprintf(out,"CheckSum          : %08" L32x "\n", header.CheckSum);
+	fprintf(out,"TimeDateStamp     : %"   L32u "\n", header.TimeDateStamp);
+	fprintf(out,"Flags             : %08" L64x "\n", header.Flags);
 	dump_dir( fd, header.StreamDirectoryRva, header.NumberOfStreams, out, 0 );
 }
 
