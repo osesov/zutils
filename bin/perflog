@@ -221,8 +221,8 @@ BEGINFILE {
 #    print "start: " start[boot], ts2str(start[boot]), $0;
 }
 
-#!start[dal] && /\[DalManager\]/ {
-/DAL: main: DAL version/ { # first DAL message
+!start[dal] && /\[DalManager\]/ {
+# /DAL: main: DAL version/ { # first DAL message
     if (!start[boot]) {
 	print "no start message found"
 	next;
