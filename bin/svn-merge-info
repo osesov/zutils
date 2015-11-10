@@ -1,0 +1,53 @@
+#!/bin/bash
+# This is not a great solution, but it works for gathering the data
+
+if ! [ -f .svn/format ]; then
+    echo "Not an SVN workdir"
+    exit 1
+fi
+
+HEAD=$(svn info |grep ^Revision: |cut -d ' ' -f2)
+URL=$(svn info |grep ^URL |cut -d ' ' -f2)
+
+echo "url " $URL "@"$HEAD
+
+b=1
+e=$HEAD
+#prop="svn:externals"
+prop="svn:mergeinfo"
+
+user='[a-z.]+'
+
+for i in "$@"; do
+	if [[ $i =~ ([0-9]+):([0-9]+) ]]; then
+		b=${BASH_REMATCH[1]}
+		e=${BASH_REMATCH[2]}
+	elif [[ $i =~ :([0-9]+) ]]; then
+		e=${BASH_REMATCH[2]}
+	elif [[ $i =~ ([0-9]+): ]]; then
+		b=${BASH_REMATCH[1]}
+	else
+		print "Unknown option: %s\n" %i
+		exit 1
+	fi
+done
+
+shift $(($OPTIND-1))
+
+CURRENT_REVISION=95300
+OLDEST_REVISION=93000
+
+for i in `seq $e -1 $b`
+do
+    if [ -t 1 ]; then
+	    printf "%d\r" $i
+    fi
+    svn diff -c$i "$URL" | sed -n -e '/^   Merged /p' | sed -e "s/^[ ]*Merged /$i: /"
+
+#    n=$(svn -r$i propget "$prop" "$URL" | sed -e "s/^/$i\t/")
+#    if [ "$n" != "$o" ]; then
+#	echo "$n"
+#	o="$n"
+#    fi
+#    svn -r$i proplist "$URL" | sed -e "s/^/$i\t/"
+done
