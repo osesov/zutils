@@ -1,5 +1,7 @@
 #! /bin/bash
 
+# set -x
+
 unset LANG
 
 sln=PowerUp.sln
@@ -582,6 +584,7 @@ while [ "$p" != "/" ]; do
 done
 
 #curdir=${curdir#$p/}
+curdir=$p
 echo slndir: $p
 echo curdir: $curdir
 
@@ -590,7 +593,7 @@ if [ ! -f "$p/$makefile" ]; then
 	exit 1
 fi
 
-echo "Using dir: $p"
+#echo "Using dir: $p"
 cd $p
 
 export ENABLE_DEBUG_SYMBOLS=1
