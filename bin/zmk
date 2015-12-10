@@ -242,11 +242,12 @@ function build-sln-entry()
 {
 	local dir=$1
 	local target=$2
+	local action=$3
 
 	if [ "$dryrun" != "yes" ]; then
 	(
 		cd $dir
-		bash ./make.sh $target || exit 1
+		bash ./make.sh ${action}${target} || exit 1
 	) || return 1
 	fi
 }
@@ -263,6 +264,7 @@ function build-solution()
 	local dir
 	local build_prefix=0
 	local target=$2
+	local action=$3
 	local cur
 	local build_mode=regular
 
@@ -275,6 +277,11 @@ function build-solution()
 		curdir=${curdir%%/*}        # strip all the path names from the right, except first one
 		curdir=${slndir}/${curdir}/ # combine the upper level project name
 	fi
+
+	case $action in
+	build) action=;;
+	clean) action=clean-;
+	esac
 
 	while read a || [ -n "$a" ]; do
 		params=()
@@ -376,7 +383,7 @@ function build-solution()
 	for k in ${!skip[@]}; do
 		if [ "${skip[$k]}" = "$build_mode" ]; then
 			echo Make ${build[$k]} --- $target
-			if ! build-sln-entry ${build[$k]} $target; then
+			if ! build-sln-entry ${build[$k]} $target $action; then
 				exit 1
 			fi
 		else
@@ -386,11 +393,25 @@ function build-solution()
 	done
 }
 
+
+function build-makefile()
+{
+	local curdir=$1
+	local target=$2
+	local action=$3
+
+	cd $slndir
+	case $action in
+	build) bash ./make.sh $target || exit 1;;
+	clean) bash ./make.sh clean-$target || exit 1;;
+	esac
+}
+
 function make-sh()
 {
     case $1 in
     build)
-		build-solution $curdir $2 || exit 1
+		build-$makefile $curdir $2 $1 || exit 1
 #		bash ./make.sh $2 || exit 1
 		if [ "$scope" == "world" ]; then
 			if [ "$mode" == "dbg" -o "$ENABLE_DEBUG_SYMBOLS" = "1" ]; then
@@ -402,7 +423,7 @@ function make-sh()
 		    fi
 		fi
 		;;
-    clean)      cd ${curdir}; bash ./make.sh clean-$2 ;;
+    clean)      build-$makefile $curdir $2 $1 || exit 1;; # cd ${curdir}; bash ./make.sh clean-$2 ;;
     rebuild)    make-sh clean $2 && make-sh build $2;;
     update)     cd ../.. && ./vcs.sh update;;
     set-config) save-config;;
@@ -546,20 +567,20 @@ fi
 
 case $scope in
 world)
-	makefile=PowerUp.sln
+	makefile_list=PowerUp.sln
 	build=make-sh
 	dir_list="native/apps apps ../apps"
 	echo "*** build world ***"
 	;;
 
 module)
-	makefile=solution
+	makefile_list="solution makefile"
 	build=make-sh
 	echo "*** build module ***"
 	;;
 
 project)
-	makefile=PowerUp.sln
+	makefile_list=PowerUp.sln
 	build=make-sh
 	echo "*** build project ***"
 	;;
@@ -569,27 +590,31 @@ esac
 curdir=$(pwd)
 p=$(pwd)
 while [ "$p" != "/" ]; do
-	if [ -f $p/$makefile ]; then
-		found=yes
-		break 1
-	fi
-	for dir in $dir_list; do
-		if [ -f $p/$dir/$makefile ]; then
+	for makefile in $makefile_list; do
+		if [ -f $p/$makefile ]; then
 			found=yes
-			p=$p/$dir
 			break 2
 		fi
+		for dir in $dir_list; do
+			if [ -f $p/$dir/$makefile ]; then
+				found=yes
+				p=$p/$dir
+				break 3
+			fi
+		done
 	done
 	p=`dirname $p`
 done
 
 #curdir=${curdir#$p/}
-curdir=$p
-echo slndir: $p
+#curdir=$p
+slndir=$p
+echo slndir: $slndir
 echo curdir: $curdir
+echo makefile: $makefile
 
-if [ ! -f "$p/$makefile" ]; then
-	echo "$makefile not found"
+if [ -z "$makefile" -o ! -f "$p/$makefile" ]; then
+	echo "makefile not found ($makefile_list)"
 	exit 1
 fi
 
