@@ -1,0 +1,2 @@
+#!/bin/bash
+comm -23 <(sort <(svn ls . -R | grep -v "/$")) <(sort <(sed 's/ - native//g' <(svn propget svn:eol-style . -R)))
