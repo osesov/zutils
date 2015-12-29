@@ -108,6 +108,12 @@ if [ "$found" != "yes" ]; then
     die "Box '$box' is not found in $boxlist"
 fi
 
+case "$mode" in 
+    com|tn)
+	tput reset
+	;;
+esac
+
 echo "$box" > "$curbox"
 echo "Using box: $box"
 
