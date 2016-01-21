@@ -5,6 +5,7 @@
 	  (add-to-list 'load-path q)))
 
 (require 'psvn)
+(setq svn-status-hide-unmodified t)
 
 (setq user-mail-address "oleg.sesov@dev.zodiac.tv")
 
@@ -40,3 +41,14 @@
 ;(loop for x being the symbols
 ;    if (boundp x)
 ;    do (print (cons (symbol-name x) (symbol-value x))))
+
+;; shell
+(defun my-shell-clear ()
+  (interactive)
+  (erase-buffer)
+  (comint-send-input))
+
+(defun my-shell-hook ()
+  (local-set-key "\C-cl" 'my-shell-clear))
+
+(add-hook 'shell-mode-hook 'my-shell-hook)
