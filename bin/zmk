@@ -7,7 +7,9 @@ unset LANG
 sln=PowerUp.sln
 confdir=${XDG_CONFIG_HOME:-$HOME/.config}/zmk
 config=${confdir}/zmk.config
-os=$(uname -s | tr [:upper:] [:lower:])
+os=$(uname -s | tr '[:upper:]' '[:lower:]')
+
+declare -A toolchain
 
 [ -d "$confdir" ] || mkdir -p "$confdir"
 [ -f "$config" ] && source "$config"
@@ -54,13 +56,10 @@ function use-target()
 		die "Target is not set"
 	fi
 
-	old_ifs=$IFS
-	IFS='-'
-	read mso platform mode <<< "$target"
-	IFS=$old_ifs
+	IFS='-' read mso platform mode <<< "$target"
 
 	case $target in
-		*-c5320-*|*-samsung-*|*-humax-*|*-humaxwb-*)
+		*-c5320-*|*-samsung-*|*-humax-*|*-humaxwb-*|*-ciscowb-*)
 			cpu=mips;;
 		*-samsung4k-*|*-humax4k-*)
 			cpu=arm;;
@@ -409,9 +408,18 @@ function build-makefile()
 
 function make-sh()
 {
+    local builder=$(echo "$makefile" | tr '[:upper:]' '[:lower:]') 
+    case "$builder" in
+    makefile|solution)
+	: ;;
+    powerup.sln)
+	builder=solution
+	;;
+    esac
+
     case $1 in
     build)
-		build-$makefile $curdir $2 $1 || exit 1
+		build-$builder $curdir $2 $1 || exit 1
 #		bash ./make.sh $2 || exit 1
 		if [ "$scope" == "world" ]; then
 			if [ "$mode" == "dbg" -o "$ENABLE_DEBUG_SYMBOLS" = "1" ]; then
@@ -423,7 +431,7 @@ function make-sh()
 		    fi
 		fi
 		;;
-    clean)      build-$makefile $curdir $2 $1 || exit 1;; # cd ${curdir}; bash ./make.sh clean-$2 ;;
+    clean)      build-$builder $curdir $2 $1 || exit 1;; # cd ${curdir}; bash ./make.sh clean-$2 ;;
     rebuild)    make-sh clean $2 && make-sh build $2;;
     update)     cd ../.. && ./vcs.sh update;;
     set-config) save-config;;
@@ -629,7 +637,10 @@ export ENABLE_DEBUG_SYMBOLS=1
 echo "Build $scope $target"
 for t in $target; do
     use-target $t
-    for i in $action; do
+    OLD_PATH=$PATH
+    export PATH="${toolchain[$platform]}:${PATH}"
+    for i in "$action"; do
 	$build $i $t || exit 1
     done
+    export PATH="$OLD_PATH"
 done
