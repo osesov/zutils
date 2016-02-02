@@ -112,14 +112,15 @@ function print_stats()
 	printf("%d)", boot_index )
 	print_arr( time );
 
-# update average
+#	update average
 	for (i in title) {
 		avg[i] = avg[i] + time[i];
 	}
 	averages++;
 
-#    printf("%s\t%s\t%s\n", dal_time, powerup_time, ready_to_watch_time)
-#    start[boot] = 0;
+#	printf("%s\t%s\t%s\n", dal_time, powerup_time, ready_to_watch_time)
+#	start[boot] = 0;
+	mark_print();
 }
 
 function print_final()
@@ -153,6 +154,7 @@ function begin_boot()
 		out = sprintf("%s.part.%02d.log", FILENAME, boot_index );
 		printf("") > out;
 #		print "BOOT: " boot_index ")", $0
+		mark_clear();
 	}
 }
 
@@ -163,6 +165,35 @@ function print_state(s)
 	}
 }
 
+function mark_begin( name, tm )
+{
+	mark_begin_time[ name ] = tm;
+}
+
+function mark_end( name, tm )
+{
+	if ( name in mark_begin_time ) {
+		mark_times[ name ] = tm - mark_begin_time[ name ];
+		delete mark_begin_time[ name ]
+	}
+}
+
+function mark_clear()
+{
+	delete mark_begin_time;
+	delete mark_times;
+}
+
+function mark_print()
+{
+	for (i in mark_times) {
+		printf("%s: %s\n", i, mark_times[i]);
+	}
+}
+
+########################################################################
+## File parsing
+########################################################################
 BEGINFILE {
 
 # indices
