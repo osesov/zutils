@@ -7,7 +7,8 @@ declare -A tags
 
 root=$(svn info | grep "^Repository Root:" | awk '{print $3}')
 #echo $root
-rev=$(svn diff . | grep "   Merged /")
+rev=$(svn diff --properties-only . | grep "^   Merged /")
+rrev=$(svn diff --properties-only . | grep "^   Reverse-merged /")
 output=commit.txt
 
 commitinfo=$1
@@ -27,7 +28,9 @@ function checkrev()
 	# #SkyUI_RDK-154:vct_id i timezone issue support:Information for QA - "fix POWER_STATE argument"
 	# ------------------------------------------------------------------------
 	local line
-	msg=$(svn log $root$branch -r $1 | sed -e '1,2d' -e '$d' | sed -e '1{/^$/d}' -e '${/^$/d}' )
+	local action=$1
+	local rev=$2
+	msg=$(svn log $root$branch -r $rev | sed -e '1,2d' -e '$d' | sed -e '1{/^$/d}' -e '${/^$/d}' )
 	if [ -z "$msg" ]; then
 		return
 	fi
@@ -37,7 +40,7 @@ function checkrev()
 	fi
 	
 	tag=
-	putline "Merge: %s:r%d" "$branch" "$1"
+	putline "$action: %s:r%d" "$branch" "$rev"
 
 #	echo "DBG $msg"
 	while read line; do
@@ -70,38 +73,50 @@ function checkrev()
 #	fi
 }
 
-for i in $rev; do
-#	echo "--- $i"
+function checkrevlist()
+{
+	for i in "$@"; do
+#		echo "--- $i"
 
-	if [[ "$i" =~ (.+):r(.+)$ ]]; then
-		branch=${BASH_REMATCH[1]}
-		revlist=${BASH_REMATCH[2]}
-		revlist=${revlist//,/ }
+		if [[ "$i" =~ ^[\ \\t]+([^\ ].*)\ ([^\ ].*):r(.+)$ ]]; then
+# 		if [[ "$i" =~ ^[\ \\t]+([^\ ].*)\ ([^\ ].*):r(.+)$ ]]; then
+			action=${BASH_REMATCH[1]}
+			branch=${BASH_REMATCH[2]}
+			revlist=${BASH_REMATCH[3]}
+			revlist=${revlist//,/ }
 
-#		echo $branch
-#		echo $revlist
+#			echo "line: $i"
+#			echo "action: $action"
+#			echo "branch: $branch"
+#			echo "revlist: $revlist"
 
-		for r in $revlist; do
+			for r in $revlist; do
 
-			if [[ "$r" =~ ([0-9]+)-([0-9]+) ]]; then
-				
-				c=${BASH_REMATCH[1]}
-				e=${BASH_REMATCH[2]}
-				checkrev $c
+				if [[ "$r" =~ ([0-9]+)-([0-9]+) ]]; then
 
-				while (($c != $e)); do
-					c=$((c+1))
-					if ! checkrev $c; then break; fi
-				done
+					c=${BASH_REMATCH[1]}
+					e=${BASH_REMATCH[2]}
+					checkrev "$action" $c
 
-			else
-				if ! checkrev $r; then break; fi
-			fi
-		done
-	fi
+					while (($c != $e)); do
+						c=$((c+1))
+						if ! checkrev "$action" $c; then break; fi
+					done
 
-done
+				else
+					if ! checkrev "$action" $r; then break; fi
+				fi
+			done
+		fi
 
+	done
+}
+
+#echo "$rev"
+#echo "$rrev"
+
+checkrevlist "$rev"
+checkrevlist "$rrev"
 
 #build tags
 for i in ${tags[@]}; do
