@@ -1,0 +1,21 @@
+#! /bin/bash
+
+mask=( "$@" )
+
+if [[ "${#mask[@]}" == 0 ]]; then
+    mask=( '' )
+fi
+
+for i in $(svn status | grep ^\? | cut -c9-); do
+	found=
+
+	for m in "${mask[@]}"; do
+		if [[ "$i" == $m* ]]; then
+			found=yes; break
+		fi
+	done
+
+	if [[ "$found" == "yes" ]]; then
+		rm -rf $i
+	fi
+done
