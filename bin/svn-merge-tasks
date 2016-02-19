@@ -1,0 +1,58 @@
+config=svn.config
+
+function die()
+{
+    echo $*
+    exit 1
+}
+
+source "$config" || die "unable to find: $config"
+[ -n "$MERGE" ] || die "MERGE is not set"
+
+declare -A tasks
+order=()
+
+branch=^/$MERGE
+
+echo "$branch"
+
+function add_rev()
+{
+	local t=$1
+	local r=$2
+
+	if [ ${tasks[$t]+_} ]; then
+		tasks[$t]+=" $r"
+	else
+		order+=( $t )
+		tasks[$t]=$r
+	fi
+}
+
+function flush()
+{
+	local i
+	local j
+
+	for i in "${order[@]}"; do
+		echo "http://trackstudio.developonbox.ru/!/dashboard/#/$i/:view/ ${tasks[$i]}"
+	done
+}
+
+# [ -f log ] && rm -rf log
+
+# for rev in 1375 1376 1377 1378 1379; do
+for rev in $(svn mergeinfo --show-revs eligible $branch .); do
+	rev=${rev#r}
+	while read line; do
+
+		if [[ "$line" =~ ^\#([^:]+): ]]; then
+			t=${BASH_REMATCH[1]}
+#			echo "$rev $t"
+			add_rev $t $rev
+		fi
+
+	done < <(svn log $branch -c${rev} | grep "^#")
+done
+
+flush
