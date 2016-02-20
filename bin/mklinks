@@ -94,13 +94,6 @@ function link()
 }
 
 
-function add()
-{
-	target=$1;
-	shift
-	eval "$target+=\" $*\""
-}
-
 while (( $# )); do
 	case $1 in
 	--srcdir)
@@ -116,9 +109,41 @@ done
 [ -n "$srcdir" ] || srcdir=$1
 [ -n "$srcdir" ] || die "No src dir specified"
 
-add bin supervisor             DALManager       ncas_host_app  powerup-launcher  swtv            dpi_host_app
-add lib libb_dcc_zodiac.so     libcarousels.so  libdc.so       libdts.so         libekg.so       libipc.so  libjpeg.so          libnetsnmphelpers.so  libnetsnmp.so  libpng.so          libpowerup.so  libsdv.so   libtoopl.so  libz.so
-add lib libbreakpad_client.so  libcurl.so       libde.so       libdvbs.so        libfreetype.so  libipg.so  libnetsnmpagent.so  libnetsnmpmibs.so     libns.so       libpowerup-api.so  libprofile.so  libskia.so  libyaml.so   libzvod.so
+bin=$(zconfig 
+add bin supervisor \
+	DALManager \
+	ncas_host_app \
+	powerup-launcher \
+	swtv \
+	dpi_host_app
+
+add lib libatasmart.so \
+	libb_dcc_zodiac.so \
+	libbreakpad_client.so \
+	libcarousels.so \
+	libcurl.so \
+	libdisk_storage.so \
+	libdts.so \
+	libdvbs-common.so \
+	libdvbs.so \
+	libev.so \
+	libfreetype.so \
+	libipc.so \
+	libjpeg.so \
+	libnetsnmpagent.so \
+	libnetsnmphelpers.so \
+	libnetsnmpmibs.so \
+	libnetsnmp.so \
+	libpng.so \
+	libpowerup.so \
+	libprofile.so \
+	libsdv.so \
+	libskia.so \
+	libtoopl.so \
+	libudev.so \
+	libyaml.so \
+	libz.so \
+	libzvod.so
 
 link usr/bin ../.. $bin
 link usr/lib ../.. $lib
