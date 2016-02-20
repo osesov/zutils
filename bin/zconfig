@@ -1,0 +1,46 @@
+#!/bin/bash
+
+target=$1; shift;
+request=$1; shift
+
+function add()
+{
+    local var="$1";  shift
+    local mask="$1"; shift
+
+    case "$mask" in
+    $target)
+	    for i in $*; do
+		eval "$var+=\" $i\""
+	    done	    
+    esac
+}
+
+function lib()
+{
+    local mask="$1"; shift
+    add lib "$mask" $*
+}
+
+function bin()
+{
+    local mask="$1"; shift
+    add bin "$mask" $*
+}
+
+bin 'charter-*-*' ata_id udevd
+bin '*-*-*'       DALManager dpi_host_app history ncas_host_app powerup-launcher sdvd supervisor swtv
+
+lib '*-*-*'       libatasmart.so  libdisk_storage.so
+lib '*-*-*'       libb_dcc_zodiac.so libbreakpad_client.so libcarousels.so libcurl.so
+lib '*-*-*'       libdts.so libdvbs-common.so libdvbs.so libev.so libfreetype.so
+lib '*-*-*'       libipc.so libjpeg.so libnetsnmpagent.so libnetsnmphelpers.so libnetsnmpmibs.so libnetsnmp.so
+lib '*-*-*'       libpng.so libpowerup.so libprofile.so libsdv.so libskia.so libtoopl.so
+lib '*-*-*'       libudev.so libyaml.so libz.so libzvod.so
+lib '*-*-*'       libmemdebug.so
+
+case $request in
+all) echo "$bin $lib";;
+bin) echo "$bin";;
+lib) echo "$lib";;
+esac
