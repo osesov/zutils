@@ -209,7 +209,7 @@ function send_file()
 
 function dist_files()
 {
-	for i in $@; do
+	for i in "$@"; do
 		files+=("$i")
 	done
 }
@@ -331,6 +331,7 @@ if (( ${#files[@]} == 0 )); then
 	dist_files  libbreakpad_client.so libpng.so
 	dist_files  libmemdebug.so
 fi
+dist_files $(zconfig $target all)
 
 # Check publisher
 
