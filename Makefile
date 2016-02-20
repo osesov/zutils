@@ -14,7 +14,9 @@ ifneq ($(filter $(system),x86_64),)
     BIN_FILES+=$(X64_FILES)
 endif
 
+.PHONY: install
 install: $(addprefix bin/,$(BIN_FILES))
 	@for i in $(BIN_FILES); do echo "$$i..."; ln -sf `pwd`/bin/$$i ~/bin/; done
 	ln -sf `pwd`/bin/tn ~/bin/cmd2k
+	ln -sf `pwd`/bin/tn ~/bin/zssh
 	ln -sf `pwd`/emacs/init.el ~/.emacs.d/init.el

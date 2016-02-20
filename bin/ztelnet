@@ -1,15 +1,14 @@
 #!/usr/bin/expect -f
 
 set timeout 20
-set ip       [lindex $argv 0]
-set port     [lindex $argv 1]
-set user     [lindex $argv 2]
-set password [lindex $argv 3]
-set tail     [lindex $argv 4]
-set dir      [lindex $argv 5]
-set exe      [lindex $argv 6]
+set cmd      [lindex $argv 0]
+set user     [lindex $argv 1]
+set password [lindex $argv 2]
+set tail     [lindex $argv 3]
+set dir      [lindex $argv 4]
+set exe      [lindex $argv 5]
 
-send_user "port: $port\n"
+send_user "cmd: $cmd\n"
 send_user "dir: $dir\n"
 
 if { [string compare $tail "" ] == 0} {
@@ -45,9 +44,10 @@ proc defproc {} {
     interact
 }
 
-spawn telnet $ip $port
-expect "'^]'."
+spawn {*}$cmd
+
 expect {
+	-nocase "'^]'."                {}
 	-nocase "login:"               { send "$user\r";     exp_continue; }
 	-nocase "password:"            { send "$password\r"; exp_continue; }
 	-nocase "\[$#] "               { $tail; }

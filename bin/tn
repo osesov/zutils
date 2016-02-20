@@ -19,7 +19,7 @@ source $config
 
 if [ "$mode" = "tn" ]; then
     case $1 in
-    cmd2k|snmpget|snmpwalk|set|getfile|com|list|status)
+    cmd2k|snmpget|snmpwalk|set|getfile|com|list|status|ssh|zssh)
 	mode=$1
 	shift
 	;;
@@ -29,7 +29,7 @@ fi
 case $mode in
     set|tn|list|status) ;;
 
-    cmd2k|snmpget|snmpwalk|getfile)
+    cmd2k|snmpget|snmpwalk|getfile|ssh|zssh)
 	addrtype=ip;;
 
     com)
@@ -123,16 +123,17 @@ echo "Address: $addr($mode)"
 
 function xtelnet()
 {
+	local cmd=$1
 	case $addrtype in
 	ip|rf)
 #		ping -w90 -c1 $addr || die "Unable to ping box"
 #		sleep 0.5
 		zping --time 120000 --wait 1000 $addr:telnet || die "Unable to ping box: $addr"
 #		exec telnet $addr
-		exec $(dirname $0)/ztelnet $addr telnet root wb@humax "$1" "$rundir" "${exe:-./run-powerup.sh}"
+		exec $(dirname $0)/ztelnet "$cmd" root wb@humax "$2" "$rundir" "${exe:-./run-powerup.sh}" | tee tn.log
 		;;
 	com)
-		sudo -u zodiac miniterm.py $com 115200
+		sudo -u zodiac miniterm.py $com 115200 | tee tn.log
 		;;
 	esac
 }
@@ -146,8 +147,12 @@ case "$mode" in
 	cmd2000 $addr "$*" 2>/dev/null # | cut -b46-
 	;;
 
+    ssh|zssh)
+	xtelnet "ssh -i ${HOME}/.ssh/id_rsa_zodiac_dev_user root@${addr}" $1
+	;;
+
     tn)
-	xtelnet $1
+	xtelnet "telnet $addr telnet" $1
 	;;
 
     snmpwalk)
