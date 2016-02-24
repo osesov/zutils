@@ -11,7 +11,20 @@ rev=$(svn diff --properties-only . | grep "^   Merged /")
 rrev=$(svn diff --properties-only . | grep "^   Reverse-merged /")
 output=commit.txt
 
-commitinfo=$1
+while getopts ":t:m:" opt; do
+  case $opt in
+    t) committask="$OPTARG";;
+    m) commitinfo="$OPTARG";;
+    \?) echo "Invalid option: -$OPTARG" >&2 ;;
+  esac
+done
+
+shift $((OPTIND-1))
+
+if [ -z "$commitinfo" ]; then
+    commitinfo=$1; shift
+fi
+
 [ -f $output ] && rm $output
 
 function putline()
@@ -119,6 +132,10 @@ checkrevlist "$rev"
 checkrevlist "$rrev"
 
 #build tags
-for i in ${tags[@]}; do
-	putline "task:$i:notresolve:qainfo=$commitinfo"
-done
+if [ -z "$committask" ]; then
+	for i in ${tags[@]}; do
+		putline "task:$i:notresolve:qainfo=$commitinfo"
+	done
+else
+	putline "task:$committask:notresolve:qainfo=$commitinfo"
+fi
