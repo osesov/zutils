@@ -10,6 +10,8 @@ config=${confdir}/zmk.config
 os=$(uname -s | tr '[:upper:]' '[:lower:]')
 
 declare -A toolchain
+declare -A target
+declare -A dest
 
 [ -d "$confdir" ] || mkdir -p "$confdir"
 [ -f "$config" ] && source "$config"
@@ -31,14 +33,6 @@ function debug()
     :
 }
 
-function save-config()
-{
-    cat >$config <<END
-target=$target
-dest=$dest
-END
-}
-
 function split()
 {
 	old_ifs=$IFS
@@ -48,24 +42,24 @@ function split()
 	IFS=$old_ifs
 }
 
-function use-target()
+function with-target()
 {
-	target=$1
+	local build_target=$1
 
-	if [ -z "$target" ]; then
+	if [ -z "$build_target" ]; then
 		die "Target is not set"
 	fi
 
-	IFS='-' read mso platform mode <<< "$target"
+	IFS='-' read mso platform mode <<< "$build_target"
 
-	case $target in
+	case $build_target in
 		*-c5320-*|*-samsung-*|*-humax-*|*-humaxwb-*|*-ciscowb-*)
 			cpu=mips;;
 		*-samsung4k-*|*-humax4k-*)
 			cpu=arm;;
 		*-posix-*)
 			cpu=posix;;
-		*) die "Unknown CPU $target";;
+		*) die "Unknown CPU $build_target";;
 	esac
 }
 
@@ -91,7 +85,6 @@ function gensymbols-stripped()
 	for i in $builddir/*; do
 		type=$(file $i)
 		local sym=$i.sym
-		local target=$symdir/${i##*/}
 		local name
 		local hash
 
@@ -240,13 +233,13 @@ function realpath()
 function build-sln-entry()
 {
 	local dir=$1
-	local target=$2
+	local build_target=$2
 	local action=$3
 
 	if [ "$dryrun" != "yes" ]; then
 	(
 		cd $dir
-		bash ./make.sh ${action}${target} || exit 1
+		bash ./make.sh ${action}${build_target} || exit 1
 	) || return 1
 	fi
 }
@@ -262,7 +255,7 @@ function build-solution()
 	local slndir=$(pwd)
 	local dir
 	local build_prefix=0
-	local target=$2
+	local build_target=$2
 	local action=$3
 	local cur
 	local build_mode=regular
@@ -330,7 +323,7 @@ function build-solution()
 
 		dir="${params[copath]:-$dir}"
 		if [ ! -d "$dir" ]; then
-			debug "target path doesn't exist"
+			debug "build_target path doesn't exist"
 			skip[$cur]=yes
 			continue
 		fi
@@ -381,8 +374,8 @@ function build-solution()
 
 	for k in ${!skip[@]}; do
 		if [ "${skip[$k]}" = "$build_mode" ]; then
-			echo Make ${build[$k]} --- $target
-			if ! build-sln-entry ${build[$k]} $target $action; then
+			echo Make ${build[$k]} --- $build_target
+			if ! build-sln-entry ${build[$k]} $build_target $action; then
 				exit 1
 			fi
 		else
@@ -396,19 +389,22 @@ function build-solution()
 function build-makefile()
 {
 	local curdir=$1
-	local target=$2
+	local build_target=$2
 	local action=$3
 
 	cd $slndir
 	case $action in
-	build) bash ./make.sh $target || exit 1;;
-	clean) bash ./make.sh clean-$target || exit 1;;
+	build) bash ./make.sh $build_target || exit 1;;
+	clean) bash ./make.sh clean-$build_target || exit 1;;
 	esac
 }
 
 function make-sh()
 {
     local builder=$(echo "$makefile" | tr '[:upper:]' '[:lower:]') 
+    local action="$1"
+    local build_target="$2"
+
     case "$builder" in
     makefile|solution)
 	: ;;
@@ -417,9 +413,9 @@ function make-sh()
 	;;
     esac
 
-    case $1 in
+    case $action in
     build)
-		build-$builder $curdir $2 $1 || exit 1
+		build-$builder $curdir $build_target $action || exit 1
 #		bash ./make.sh $2 || exit 1
 		if [ "$scope" == "world" ]; then
 			if [ "$mode" == "dbg" -o "$ENABLE_DEBUG_SYMBOLS" = "1" ]; then
@@ -431,14 +427,14 @@ function make-sh()
 		    fi
 		fi
 		;;
-    clean)      build-$builder $curdir $2 $1 || exit 1;; # cd ${curdir}; bash ./make.sh clean-$2 ;;
-    rebuild)    make-sh clean $2 && make-sh build $2;;
+    clean)      build-$builder  $curdir  $build_target  $action || exit 1;; # cd ${curdir}; bash ./make.sh clean-$build_target ;;
+    rebuild)    make-sh clean $build_target && make-sh build $build_target;;
     update)     cd ../.. && ./vcs.sh update;;
-    set-config) save-config;;
-    get-config) echo $2;;
+    get-config) echo $build_target;;
     bt)         for i in $bt; do stackwalk $i; done ;;
     status)	show-status;;
-    upload)	make-sh build $2 && zupload $2 ;;
+    upload)	make-sh build $build_target && zupload $build_target ;;
+    xupload)	zupload $build_target ;;
     checkout)	checkout $checkout_date;;
     *)          echo Action is not supported; exit 1 ;; 
     esac
@@ -456,8 +452,34 @@ function push-list()
 	fi
 }
 
+function findfile()
+{
+	local makefile_list="$1"
+	local dir_list="$2"
+	local p="$(pwd)"
+
+	while [ "$p" != "/" ]; do
+		for makefile in $makefile_list; do
+			if [ -f $p/$makefile ]; then
+				echo $p/$makefile
+				return 0
+			fi
+			for dir in $dir_list; do
+				if [ -f $p/$dir/$makefile ]; then
+					echo $p/$dir/$makefile
+					return 0
+				fi
+			done
+		done
+		p=`dirname $p`
+	done
+
+	return 1
+}
+
 echo "*** make using Zodiac build system"
 
+curdir=$(pwd)
 while test $# -ne 0; do
     i=$1
     shift
@@ -491,6 +513,11 @@ while test $# -ne 0; do
 	u|upload)
 		scope="world"
 		action=upload
+		;;
+
+	xu|xupload)
+		scope="world"
+		action=xupload
 		;;
 
 	--module|--world|--upload|--project)
@@ -545,19 +572,36 @@ while test $# -ne 0; do
 		exit 1
 		;;
 
-	*)	push-list ctarget "$i"
+	*)	push-list cl_target "$i"
 		;;
 
     esac
 
 done
 
-if [ -n "$ctarget" ]; then
-	target="$ctarget"
+if [ -n "$cl_target" ]; then
+	build_target="$cl_target"
+
+elif [ -n "$target" ]; then
+	build_target=${target}
 
 elif [ -z "$target" ]; then
-	target=cvc-c5320-dev
-#	target=cvc-humax-dev
+	if ! f=$(findfile PowerUp.sln "native/apps apps ../apps"); then
+		die "Can't fin PowerUp.sln"
+	fi
+
+	dir=$(cd ${f%/*}/../..; x=$(pwd); echo ${x##*/})
+
+	if test ${target[$dir]+_}; then
+		build_target=${target[$dir]}
+	else
+		die "target is not set for $dir"
+	fi
+fi
+
+if [ -z "$build_target" ]; then
+	build_target=cvc-c5320-dev
+##	build_target=cvc-humax-dev
 fi
 
 if [ -z "$action" ]; then
@@ -595,48 +639,33 @@ project)
 
 esac
 
-curdir=$(pwd)
-p=$(pwd)
-while [ "$p" != "/" ]; do
-	for makefile in $makefile_list; do
-		if [ -f $p/$makefile ]; then
-			found=yes
-			break 2
-		fi
-		for dir in $dir_list; do
-			if [ -f $p/$dir/$makefile ]; then
-				found=yes
-				p=$p/$dir
-				break 3
-			fi
-		done
-	done
-	p=`dirname $p`
-done
+if ! p=$(findfile "$makefile_list" "$dir_list") ; then
+	echo "makefile not found ($makefile_list)"
+	exit 1
+fi
+slndir=${p%/*}
+makefile=${p##*/}
 
-#curdir=${curdir#$p/}
-#curdir=$p
-slndir=$p
 echo slndir: $slndir
 echo curdir: $curdir
 echo makefile: $makefile
 
-if [ -z "$makefile" -o ! -f "$p/$makefile" ]; then
+if [ -z "$makefile" -o ! -f "$p" ]; then
 	echo "makefile not found ($makefile_list)"
 	exit 1
 fi
 
 #echo "Using dir: $p"
-cd $p
+cd $slndir
 
 export ENABLE_DEBUG_SYMBOLS=1
 #export LDFLAGS=-g
 #export CFLAGS=-g
 #export CXXFLAGS=-g
 
-echo "Build $scope $target"
-for t in $target; do
-    use-target $t
+echo "Build $scope $build_target"
+for t in $build_target; do
+    with-target $t
     OLD_PATH=$PATH
     export PATH="${toolchain[$platform]}:${PATH}"
     for i in "$action"; do
