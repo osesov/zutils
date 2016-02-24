@@ -6,12 +6,11 @@ confdir=${XDG_CONFIG_HOME:-$HOME/.config}/zmk
 cachedir=${XDG_CACHE_HOME:-$HOME/.cache}/zupdate
 config=${confdir}/zmk.config
 
+declare -A toolchain
+declare -A target
+declare -A dest
+
 [ -f $config ] && source $config
-
-if [ -z "$dest" ]; then
-	die "'dest' is not set"
-fi
-
 
 function die()
 {
@@ -72,7 +71,7 @@ function remote()
 			rm_port=${BASH_REMATCH[3]}
 			rm_dir=${BASH_REMATCH[4]}
 		else
-			die "Unvalid file specification '$dest'"
+			die "Unvalid file specification '$destdir'"
 		fi
 
 		rm_tmpdir=${cachedir}/${rm_server}
@@ -214,13 +213,52 @@ function dist_files()
 	done
 }
 
+# copy frm zmk
+
+function findfile()
+{
+	local makefile_list="$1"
+	local dir_list="$2"
+	local p="$(pwd)"
+
+	while [ "$p" != "/" ]; do
+		for makefile in $makefile_list; do
+			if [ -f $p/$makefile ]; then
+				echo $p/$makefile
+				return 0
+			fi
+			for dir in $dir_list; do
+				if [ -f $p/$dir/$makefile ]; then
+					echo $p/$dir/$makefile
+					return 0
+				fi
+			done
+		done
+		p=`dirname $p`
+	done
+
+	return 1
+}
+
+if ! f=$(findfile PowerUp.sln "native/apps apps ../apps"); then
+	die "Can't find PowerUp.sln"
+fi
+
+dir=$(cd ${f%/*}/../..; x=$(pwd); echo ${x##*/})
+
+if test ${dest[$dir]+_}; then
+	destdir=${dest[$dir]}
+else
+	die "dest is not set for $dir"
+fi
+
 #pwd
 
 while (( $# )); do
 	case $1 in
 	--source) shift; source=$1  ;;
-	--target) shift; target=$1  ;;
-	--dest)   shift; dest=$1    ;;
+	--target) shift; send_target=$1  ;;
+	--dest)   shift; destdir=$1    ;;
 	--)       shift;
 
 		while (( $# )); do
@@ -238,8 +276,8 @@ while (( $# )); do
 	shift
 done
 
-if [ -z "$target" ]; then
-	target=$1
+if [ -z "$send_target" ]; then
+	send_target=$1
 	shift;
 fi
 
@@ -248,12 +286,19 @@ if [ -z "$source" ]; then
 	shift
 fi
 
-if [ -z "$target" ]; then
+if [ -z "$send_target" ]; then
+	if test ${target[$dir]+_}; then
+		send_target=${target[$dir]}
+	else
+		die "target is not set for $dir"
+	fi
+fi
+
+if [ -z "$send_target" ]; then
 	die "Target is not set"
 fi
 
-
-case $dest in
+case $destdir in
 	*://*)
 		;;
 
@@ -262,52 +307,46 @@ case $dest in
 
 		for i in $alt_dir; do
 			if [ -d "$i" ]; then
-				dest=$i/dal
+				destdir=$i/dal
 				break;
 			fi
 		done
 		;;
 esac
 
-if [ -z "$dest" ]; then
+if [ -z "$destdir" ]; then
 	echo "unable to detect top dir"
 	exit 1
 fi
 
-IFS='-' read mso platform mode <<< "$target"
+IFS='-' read mso platform mode <<< "$send_target"
 
-case $target in
+case $send_target in
 	*-c5320-*|*-samsung-*|*-humax-*|*-humaxwb-*)
 		cross=mipsel-linux-
 		cpu=mips;;
 	*-samsung4k-*|*-humax4k-*)
 		cross=arm-linux-
 		cpu=arm;;
-	*) die "Unknown CPU $target";;
+	*) die "Unknown CPU $send_target";;
 esac
 
 # toolchain
-case $target in
-	*-c5320-*|*-samsung-*|*-humax-*)
-		toolchain=/opt/toolchains/gcc-4.2.0/bin;;
-	*-humaxwb-*)
-		toolchain=/opt/toolchains/stbgcc-4.5.4-2.8/bin;;
-	*) die "Unknown toolchain $target";;
-esac
-
-${toolchain:+eval PATH=$toolchain:$PATH}
+if [ ${toolchain[$platform]+_} ]; then
+	export PATH="${toolchain[$platform]}:${PATH}"
+fi
 
 # normalize destination url
-case $dest in
+case $destdir in
     *://*) ;;
-    *)     dest=file://$dest;;
+    *)     destdir=file://$destdir;;
 esac
 
 src=$source/output/$platform-$cpu-$mso/$mode
 #src=../output/c5320-mips-cvc/dev
 
 
-echo "publish ($src) to $dest"
+echo "publish ($src) to $destdir"
 
 if (( $# )); then
 	for i in "$@"; do
@@ -336,7 +375,7 @@ dist_files $(zconfig $target all)
 # Check publisher
 
 if [ -z "$puhlisher" ]; then
-	case $dest in
+	case $destdir in
 	file://*) publisher=file;;
 	svn://*)  publisher=svn ;;
 	sftp://*) publisher=curl ;;
@@ -347,17 +386,17 @@ fi
 
 [ -n "$publisher" ] || die "Unknown publisher"
 
-echo "Publish $target from '$source' to '$dest'"
-$publisher begin $dest
+echo "Publish $send_target from '$source' to '$destdir'"
+$publisher begin $destdir
 
 for i in $files; do
     case $i in
-    *:*) send_file $src/${i%:*} $dest/${i##*:};;
-    *)   send_file $src/$i $dest/$i;;
+    *:*) send_file $src/${i%:*} $destdir/${i##*:};;
+    *)   send_file $src/$i $destdir/$i;;
     esac
 done
 
-$publisher end $dest
+$publisher end $destdir
 
 for g in ${group_cfg[@]}; do
 	
