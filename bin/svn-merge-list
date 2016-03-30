@@ -24,9 +24,10 @@ function flush()
 }
 
 [ -f log ] && rm -rf log
-
+source=${1:-.}
+target="$branch/$1"
 # for rev in 1375 1376 1377 1378 1379; do
-for rev in $(svn mergeinfo --show-revs eligible $branch .); do
+for rev in $(svn mergeinfo --show-revs eligible $target $source); do
 	rev=${rev#r}
 	unset tasks
 	while read line; do
