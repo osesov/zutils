@@ -1,21 +1,81 @@
 #! /bin/bash
 
-mask=( "$@" )
+action=ask
 
-if [[ "${#mask[@]}" == 0 ]]; then
-    mask=( '' )
+while getopts ":nfahli:x:" opt; do
+  case $opt in
+    n|l)
+      action=show
+      ;;
+    f)
+      action=remove
+      ;;
+    i) include+=( "${OPTARG}" );;
+    x) exclude+=( "${OPTARG}" );;
+    h)
+      printf "usage: %s [-anfh] <MASK>...\n" ${0##*/}
+      printf "  -a   ask removal\n"
+      printf "  -n   show removable files without removing them\n"
+      printf "  -f   remove files without prompt\n"
+      printf "  -h   this message\n"
+      exit 0
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      exit 1
+      ;;
+    :)
+      echo "Option -$OPTARG requires an argument." >&2
+      exit 1
+      ;;
+  esac
+done
+
+shift $((OPTIND-1))
+
+for i in "$@"; do
+    include+=( "$i" )
+done
+
+if [[ "${#include[@]}" == 0 ]]; then
+    include=( '*' )
 fi
 
 for i in $(svn status | grep ^\? | cut -c9-); do
 	found=
 
-	for m in "${mask[@]}"; do
-		if [[ "$i" == $m* ]]; then
+	for m in "${include[@]}"; do
+		if [[ "$i" == $m ]]; then
 			found=yes; break
 		fi
 	done
 
+	for m in "${exclude[@]}"; do
+		if [[ "$i" == $m ]]; then
+			found=no; break
+		fi
+	done
+
 	if [[ "$found" == "yes" ]]; then
-		rm -rf $i
+		file_action=$action
+
+		case $file_action in
+		ask)
+			while [[ $file_action == ask ]]; do
+				printf "Remove %s? [y/n/a(ll)/q(uit)] "  $i
+				read answer
+				case $answer in
+				y|Y|[Yy][Ee][Ss])         file_action=remove;;
+				n|N|[Nn][Oo])             file_action=skip;;
+				a|A|[Aa][Ll][Ll])         file_action=remove; action=remove;;
+				q|Q|[Qq][Uu][Ii][Tt])     exit 0;;
+				esac
+			done
+		esac
+
+		case $file_action in
+		remove) rm -rf $i;;
+		show)   echo "$i";;
+		esac
 	fi
 done
