@@ -1,0 +1,1 @@
+TERMINFO=$(pwd) TERM=xterm LINES=60 COLUMNS=120 ./deco

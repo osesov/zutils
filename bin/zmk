@@ -5,6 +5,7 @@
 unset LANG
 
 sln=PowerUp.sln
+topsln="PowerUp.sln MotoASTB.sln"
 confdir=${XDG_CONFIG_HOME:-$HOME/.config}/zmk
 config=${confdir}/zmk.config
 os=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -53,7 +54,7 @@ function with-target()
 	IFS='-' read mso platform mode <<< "$build_target"
 
 	case $build_target in
-		*-c5320-*|*-samsung-*|*-humax-*|*-humaxwb-*|*-ciscowb-*)
+		*-c5320-*|*-samsung-*|*-humax-*|*-humaxwb-*|*-ciscowb-*|*-pace-*)
 			cpu=mips;;
 		*-samsung4k-*|*-humax4k-*)
 			cpu=arm;;
@@ -586,8 +587,8 @@ elif [ -n "$target" ]; then
 	build_target=${target}
 
 elif [ -z "$target" ]; then
-	if ! f=$(findfile PowerUp.sln "native/apps apps ../apps"); then
-		die "Can't fin PowerUp.sln"
+	if ! f=$(findfile "$topsln" "native/apps apps ../apps"); then
+		die "Can't find PowerUp.sln"
 	fi
 
 	dir=$(cd ${f%/*}/../..; x=$(pwd); echo ${x##*/})
@@ -619,7 +620,7 @@ fi
 
 case $scope in
 world)
-	makefile_list=PowerUp.sln
+	makefile_list="$topsln"
 	build=make-sh
 	dir_list="native/apps apps ../apps"
 	echo "*** build world ***"
@@ -632,7 +633,7 @@ module)
 	;;
 
 project)
-	makefile_list=PowerUp.sln
+	makefile_list="$topsln"
 	build=make-sh
 	echo "*** build project ***"
 	;;
